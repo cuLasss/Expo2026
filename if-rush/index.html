@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IF Rush - Corrida do Conhecimento</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <main id="game-shell">
+        <div id="game-canvas" aria-label="IF Rush 3D"></div>
+
+        <section id="hud" aria-live="polite">
+            <div class="hud-brand">
+                <span class="brand-mark">IF</span>
+                <div>
+                    <strong>IF Rush</strong>
+                    <span>Corrida do Conhecimento</span>
+                </div>
+            </div>
+            <button id="btn-pause" class="pause-btn" type="button" hidden>Pausar</button>
+            <div class="hud-score">
+                <span>Pontos</span>
+                <strong id="score">0</strong>
+            </div>
+            <div class="hud-score">
+                <span>Recorde</span>
+                <strong id="best-score">0</strong>
+            </div>
+        </section>
+
+        <section id="start-screen" class="screen screen-open">
+            <div class="start-copy">
+                <span class="eyebrow">IF Sudeste MG</span>
+                <h1>IF Rush</h1>
+                <p>Corra pelo campus, colete areas da Informatica e entre no ranking da banca.</p>
+            </div>
+
+            <div class="runner-card" aria-label="Personagem selecionado">
+                <div>
+                    <span>Corredor selecionado</span>
+                    <strong id="character-name">Aluno Casual</strong>
+                    <p id="character-desc">Clique em trocar personagem para preparar sua skin antes da corrida.</p>
+                </div>
+                <button id="btn-customize" class="ghost-btn" type="button">Trocar Personagem</button>
+            </div>
+
+            <div class="start-actions">
+                <button id="btn-start" class="primary-btn" type="button">Jogar Agora</button>
+                <button id="btn-ranking" class="ghost-btn" type="button">Ranking</button>
+            </div>
+
+            <div class="control-strip" aria-hidden="true">
+                <span>A / D</span>
+                <span>Setas</span>
+                <span>Espaco</span>
+                <span>Baixo = cair rapido</span>
+                <span>Swipe</span>
+            </div>
+        </section>
+
+        <section id="customize-panel" class="customize-panel" hidden>
+            <button id="customize-close" class="customize-close" type="button" aria-label="Fechar selecao">X</button>
+            <div class="customize-card">
+                <span class="eyebrow">Preparar corredor</span>
+                <h2>Trocar Personagem</h2>
+                <p>Escolha a skin, genero e cores do personagem antes de entrar na pista.</p>
+
+                <button id="customize-gender" class="gender-toggle" type="button" hidden>Genero</button>
+
+                <div class="customize-row">
+                    <button class="selector-btn" data-custom-region="character" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Personagem</span>
+                        <strong id="customize-character-name">Aluno Casual</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="character" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <div class="customize-row">
+                    <button class="selector-btn" data-custom-region="skin" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Pele</span>
+                        <strong id="customize-skin-name">Pele clara</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="skin" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <div class="customize-row">
+                    <button class="selector-btn" data-custom-region="hair" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Cabelo</span>
+                        <strong id="customize-hair-name">Liso curto preto</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="hair" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <div class="customize-row">
+                    <button class="selector-btn" data-custom-region="shirt" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Roupa</span>
+                        <strong id="customize-shirt-name">Uniforme padrao</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="shirt" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <div class="customize-row">
+                    <button class="selector-btn" data-custom-region="pants" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Calca</span>
+                        <strong id="customize-pants-name">Jeans azul</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="pants" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <button id="customize-done" class="primary-btn" type="button">Pronto Para Correr</button>
+            </div>
+        </section>
+
+        <section id="pause-panel" class="pause-panel" hidden>
+            <div class="pause-card">
+                <span class="eyebrow">Corrida pausada</span>
+                <h2>Pausa</h2>
+                <p>Respira, mira a proxima jogada e volta para a pista.</p>
+                <div class="pause-actions">
+                    <button id="btn-resume" class="primary-btn" type="button">Continuar</button>
+                    <button id="btn-pause-menu" class="ghost-btn" type="button">Menu</button>
+                </div>
+                <span class="pause-tip">Atalho: Esc</span>
+            </div>
+        </section>
+
+        <section id="game-over" class="screen" hidden>
+            <div class="result-panel">
+                <span class="eyebrow">Fim da corrida</span>
+                <h2 id="result-title">Boa gameplay!</h2>
+                <div class="result-stats">
+                    <div>
+                        <span>Pontos</span>
+                        <strong id="final-score">0</strong>
+                    </div>
+                    <div>
+                        <span>Tempo</span>
+                        <strong id="final-time">0s</strong>
+                    </div>
+                    <div>
+                        <span>Area forte</span>
+                        <strong id="final-area">Web</strong>
+                    </div>
+                </div>
+
+                <form id="score-form" class="score-form">
+                    <label for="player-name">Nome para o ranking</label>
+                    <div>
+                        <input id="player-name" maxlength="14" autocomplete="off" placeholder="Seu nome" required>
+                        <button class="primary-btn" type="submit">Salvar</button>
+                    </div>
+                </form>
+
+                <div class="end-actions">
+                    <button id="btn-retry" class="ghost-btn" type="button">Jogar de Novo</button>
+                    <button id="btn-menu" class="ghost-btn" type="button">Menu</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="ranking-panel" class="ranking-panel" hidden>
+            <div class="ranking-head">
+                <h2>Ranking Local</h2>
+                <button id="btn-close-ranking" class="icon-btn" type="button" aria-label="Fechar ranking">X</button>
+            </div>
+            <ol id="ranking-list"></ol>
+            <button id="btn-clear-ranking" class="danger-btn" type="button">Limpar Ranking</button>
+        </section>
+    </main>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Local tooling and caches
+.claude/
+test-results/
+if-rush/screenshots/
+if-rush/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.log
+
+# Generated/local runtime state
+.env
+.env.*
+
+# Large unused source-pack formats. The project runs from glTF/FBX copies.
+*.blend
+*.obj
+*.mtl
+
+# Duplicated original packs kept locally, not needed for the site runtime.
+models/Ultimate Animated Character Pack - Nov 2019-20260503T194910Z-3-001/
+models/Ultimate Nature Pack - Jun 2019-20260504T005351Z-3-001/
+models/Stylized Nature MegaKit*/FBX/
+models/Stylized Nature MegaKit*/OBJ/
+models/Stylized Nature MegaKit*/Textures/
+
+# Archives and editor files
+*.zip
+*.rar
+*.7z
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
