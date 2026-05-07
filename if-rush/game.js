@@ -224,9 +224,7 @@ const GAMEPLAY = {
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8fdcff);
-scene.fog = new THREE.Fog(0x8fdcff, 48, 190);
-
+scene.background = new THREE.Color(0x6abce2);
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(0, 7.2, 15.5);
 
@@ -243,10 +241,10 @@ const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0x4f8c58, 1.65);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x4f8c58, 1.15);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
 sun.position.set(-20, 28, 18);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -258,7 +256,7 @@ sun.shadow.camera.top = 34;
 sun.shadow.camera.bottom = -34;
 scene.add(sun);
 
-const rimLight = new THREE.DirectionalLight(0x7adfff, 0.62);
+const rimLight = new THREE.DirectionalLight(0x7adfff, 0.4);
 rimLight.position.set(18, 10, -28);
 scene.add(rimLight);
 
@@ -607,10 +605,17 @@ createTrack();
 for (let i = 0; i < 34; i++) {
     addSceneryCluster(-18 - i * 13);
 }
+scene.add(createInstitute());
 await syncRankingFromJson();
 renderRanking();
 updateCharacterSelection();
 updatePauseUi();
+
+const loading = document.getElementById('loading-screen');
+if (loading) loading.remove();
+document.getElementById('start-screen').hidden = false;
+document.getElementById('start-screen').classList.add('screen-open');
+
 animate();
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -1022,96 +1027,248 @@ function createTrack() {
     }
 }
 
-function createCampusGate() {
-    const gate = new THREE.Group();
-    const archMat = mats.concrete;
-    const roofMat = cloneTintedMaterial(mats.roof, 0xc84538);
+function createLowPolyCloud() {
+    const group = new THREE.Group();
+    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1.0 });
+    const geo = new THREE.IcosahedronGeometry(2, 0);
+    
+    const puffs = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < puffs; i++) {
+        const puff = new THREE.Mesh(geo, cloudMat);
+        puff.position.set(i * 2.0 - (puffs * 2.0)/2, Math.random() * 1.5, Math.random() * 1.5);
+        puff.scale.set(1, 0.6 + Math.random() * 0.4, 1);
+        group.add(puff);
+    }
+    return group;
+}
 
-    [-7.6, 7.6].forEach(x => {
-        const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 7.2, 1.2), archMat);
-        pillar.position.set(x, 3.6, -18);
-        pillar.castShadow = true;
-        gate.add(pillar);
-    });
+function createLowPolyTree() {
+    const group = new THREE.Group();
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x3a732a, flatShading: true, roughness: 1.0 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x54361c, flatShading: true, roughness: 1.0 });
+    
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2, 5), trunkMat);
+    trunk.position.y = 1;
+    trunk.castShadow = true;
+    group.add(trunk);
+    
+    const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(2.0, 0), leafMat);
+    leaves.position.y = 3.2;
+    leaves.castShadow = true;
+    group.add(leaves);
+    
+    if (Math.random() > 0.4) {
+        const leaves2 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 0), leafMat);
+        leaves2.position.set(1.0, 2.5, 0);
+        leaves2.castShadow = true;
+        group.add(leaves2);
+    }
+    
+    group.scale.setScalar(1 + Math.random() * 0.6);
+    return group;
+}
 
-    const top = new THREE.Mesh(new THREE.BoxGeometry(17, 1.2, 1.4), archMat);
-    top.position.set(0, 7.1, -18);
-    top.castShadow = true;
-    gate.add(top);
+function createInstitute() {
+    const group = new THREE.Group();
+    // Materials
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5f2eb, roughness: 0.9, flatShading: true });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x8a3822, roughness: 0.8, flatShading: true });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x5e1f18, roughness: 0.9, flatShading: true });
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0x3d4b5c, roughness: 0.3, flatShading: true });
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 1.0, flatShading: true });
 
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(18.5, 0.55, 2.2), roofMat);
-    roof.position.set(0, 8.05, -18);
-    roof.castShadow = true;
-    gate.add(roof);
+    const addTimber = (w, h, x, y, z, rotZ = 0) => {
+        const timber = new THREE.Mesh(new THREE.PlaneGeometry(w, h), trimMat);
+        timber.position.set(x, y, z);
+        timber.rotation.z = rotZ;
+        group.add(timber);
+    };
 
-    const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(5.6, 1.35),
-        new THREE.MeshBasicMaterial({ map: makeLabelTexture('IF', '#1f8a45'), transparent: true })
-    );
-    sign.position.set(0, 7.08, -17.24);
-    gate.add(sign);
+    const addWin = (w, h, x, y, z) => {
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(w, h), windowMat);
+        win.position.set(x, y, z);
+        group.add(win);
+    };
 
-    [-5.4, 5.4].forEach(x => {
-        const planter = new THREE.Mesh(
-            new THREE.BoxGeometry(2.4, 0.55, 1.0),
-            new THREE.MeshStandardMaterial({ color: 0xf5d197, roughness: 0.78 })
-        );
-        planter.position.set(x, 0.28, -16.9);
-        planter.castShadow = true;
-        gate.add(planter);
+    // 1. LEFT GABLE BUILDING
+    const leftBldg = new THREE.Mesh(new THREE.BoxGeometry(16, 18, 14), wallMat);
+    leftBldg.position.set(-30, 9, 0);
+    leftBldg.castShadow = true;
+    group.add(leftBldg);
 
-        for (let i = 0; i < 4; i++) {
-            const flower = new THREE.Mesh(
-                new THREE.SphereGeometry(0.16, 10, 8),
-                new THREE.MeshBasicMaterial({ color: i % 2 ? 0xff5d8f : 0xffc94a })
-            );
-            flower.position.set(x - 0.75 + i * 0.5, 0.72, -16.9 + (i % 2) * 0.18);
-            gate.add(flower);
-        }
-    });
+    const leftRoof = new THREE.Mesh(new THREE.ConeGeometry(14, 8, 4), roofMat);
+    leftRoof.rotation.y = Math.PI / 4;
+    leftRoof.position.set(-30, 22, 0);
+    group.add(leftRoof);
 
-    scene.add(gate);
+    addTimber(16, 0.5, -30, 18, 7.05); // base
+    addTimber(0.5, 8, -30, 22, 7.05); // center
+    addTimber(0.5, 12, -34, 20, 7.05, 0.6); // diag
+    addTimber(0.5, 12, -26, 20, 7.05, -0.6); // diag
+    
+    addWin(3, 5, -34, 12, 7.05);
+    addWin(3, 5, -30, 12, 7.05);
+    addWin(3, 5, -26, 12, 7.05);
+    addWin(3, 5, -34, 5, 7.05);
+    addWin(3, 5, -30, 5, 7.05);
+    addWin(3, 5, -26, 5, 7.05);
+
+    // 2. MIDDLE WING
+    const midWing = new THREE.Mesh(new THREE.BoxGeometry(34, 12, 10), wallMat);
+    midWing.position.set(-5, 6, 0);
+    midWing.castShadow = true;
+    group.add(midWing);
+
+    const midRoofMesh = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 36, 4), roofMat);
+    midRoofMesh.rotation.x = Math.PI / 2;
+    midRoofMesh.rotation.z = Math.PI / 2;
+    midRoofMesh.rotation.y = Math.PI / 4;
+    midRoofMesh.position.set(-5, 15, 0);
+    group.add(midRoofMesh);
+
+    for (let i = 0; i < 6; i++) addWin(2.5, 6, -20 + i * 5, 6, 5.05);
+
+    // 3. FRONT PROJECTING ENTRANCE
+    const frontProj = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 10), wallMat);
+    frontProj.position.set(2, 7, 6);
+    frontProj.castShadow = true;
+    group.add(frontProj);
+
+    const frontProjRoof = new THREE.Mesh(new THREE.ConeGeometry(11, 7, 4), roofMat);
+    frontProjRoof.rotation.y = Math.PI / 4;
+    frontProjRoof.position.set(2, 17.5, 6);
+    group.add(frontProjRoof);
+
+    addWin(2.5, 5, -1, 10, 11.05);
+    addWin(2.5, 5, 2, 10, 11.05);
+    addWin(2.5, 5, 5, 10, 11.05);
+    addWin(4, 5, 2, 2.5, 11.05); // Door
+
+    // 4. RIGHT WING
+    const rightWing = new THREE.Mesh(new THREE.BoxGeometry(16, 12, 10), wallMat);
+    rightWing.position.set(15, 6, 0);
+    rightWing.castShadow = true;
+    group.add(rightWing);
+
+    const rightRoofMesh = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 16, 4), roofMat);
+    rightRoofMesh.rotation.x = Math.PI / 2;
+    rightRoofMesh.rotation.z = Math.PI / 2;
+    rightRoofMesh.rotation.y = Math.PI / 4;
+    rightRoofMesh.position.set(15, 15, 0);
+    group.add(rightRoofMesh);
+
+    addWin(2.5, 6, 11, 6, 5.05);
+    addWin(2.5, 6, 15, 6, 5.05);
+    addWin(2.5, 6, 19, 6, 5.05);
+
+    // 5. THE TOWER
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(10, 45, 10), wallMat);
+    tower.position.set(28, 22.5, 2);
+    tower.castShadow = true;
+    group.add(tower);
+
+    // Tower framing
+    addTimber(10, 0.6, 28, 45, 7.05);
+    addTimber(10, 0.6, 28, 38, 7.05);
+    addTimber(10, 0.6, 28, 30, 7.05);
+    addTimber(10, 0.6, 28, 22, 7.05);
+    addTimber(0.6, 23, 23.3, 33.5, 7.05);
+    addTimber(0.6, 23, 32.7, 33.5, 7.05);
+    addTimber(0.6, 23, 28, 33.5, 7.05);
+    addTimber(0.6, 10, 25.5, 41.5, 7.05, 0.8); // X left
+    addTimber(0.6, 10, 30.5, 41.5, 7.05, -0.8); // X right
+
+    addWin(3, 6, 28, 34, 7.05);
+    addWin(3, 6, 28, 26, 7.05);
+
+    const clock = new THREE.Mesh(new THREE.CircleGeometry(2, 16), wallMat);
+    clock.position.set(28, 42, 7.1);
+    group.add(clock);
+    const clockDot = new THREE.Mesh(new THREE.CircleGeometry(0.5, 8), new THREE.MeshBasicMaterial({color: 0x000000}));
+    clockDot.position.set(28, 42, 7.2);
+    group.add(clockDot);
+
+    // Tower Roof (Flared)
+    const tRoofBase = new THREE.Mesh(new THREE.ConeGeometry(9, 4, 4), roofMat);
+    tRoofBase.rotation.y = Math.PI / 4;
+    tRoofBase.position.set(28, 47, 2);
+    group.add(tRoofBase);
+    
+    const tRoofSpire = new THREE.Mesh(new THREE.ConeGeometry(6, 14, 4), roofMat);
+    tRoofSpire.rotation.y = Math.PI / 4;
+    tRoofSpire.position.set(28, 54, 2);
+    group.add(tRoofSpire);
+
+    // Foundation
+    const baseLine = new THREE.Mesh(new THREE.BoxGeometry(68, 1.5, 12), baseMat);
+    baseLine.position.set(-2, 0.75, 0);
+    group.add(baseLine);
+
+    // Background wings
+    const backLeft = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 30), wallMat);
+    backLeft.position.set(-30, 6, -20);
+    group.add(backLeft);
+    const backRight = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 30), wallMat);
+    backRight.position.set(20, 6, -20);
+    group.add(backRight);
+
+    for(let i=0; i<3; i++) {
+        const t = createLowPolyTree();
+        t.position.set(-10 + i*8, 0, -10);
+        group.add(t);
+    }
+
+    const endGrassMat = new THREE.MeshStandardMaterial({ color: 0x3a732a, roughness: 1.0, flatShading: true });
+    const endGrass = new THREE.Mesh(new THREE.PlaneGeometry(80, 25), endGrassMat);
+    endGrass.rotation.x = -Math.PI / 2;
+    endGrass.position.set(-2, 0.05, 14);
+    group.add(endGrass);
+
+    group.scale.set(1.4, 1.4, 1.4);
+    group.position.set(0, 0, -120);
+
+    return group;
 }
 
 function addSceneryCluster(z) {
     const group = new THREE.Group();
-    const side = z % 24 === 0 ? -1 : 1;
-    const xBase = side * (13 + Math.random() * 4);
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x5a9a40, roughness: 1.0, flatShading: true });
 
-    const building = createCampusBuilding(2 + Math.floor(Math.random() * 3));
-    building.position.set(xBase + side * 3, 0, -4);
-    building.rotation.y = side > 0 ? -0.14 : 0.14;
-    group.add(building);
+    for (const side of [-1, 1]) {
+        // Low-poly grassy hills
+        const hillGeo = new THREE.IcosahedronGeometry(28 + Math.random() * 8, 1);
+        const hill = new THREE.Mesh(hillGeo, hillMat);
+        hill.position.set(side * (32 + Math.random() * 4), -10, (Math.random() - 0.5) * 10);
+        hill.scale.set(1, 0.4, 1.4);
+        hill.receiveShadow = true;
+        group.add(hill);
 
-    const treeA = createTree();
-    treeA.position.set(-side * (12 + Math.random() * 3), 0, 6);
-    group.add(treeA);
+        const bigHillGeo = new THREE.IcosahedronGeometry(45, 1);
+        const bigHill = new THREE.Mesh(bigHillGeo, hillMat);
+        bigHill.position.set(side * (52 + Math.random() * 8), -15, (Math.random() - 0.5) * 15);
+        bigHill.scale.set(1, 0.5, 1.5);
+        bigHill.receiveShadow = true;
+        group.add(bigHill);
 
-    const treeB = createTree();
-    treeB.position.set(-side * (15 + Math.random() * 2), 0, -8);
-    treeB.scale.setScalar(0.8 + Math.random() * 0.28);
-    group.add(treeB);
-
-    const bush = createBush();
-    bush.position.set(side * 8.4, 0, -12);
-    group.add(bush);
-
-    if (Math.random() > 0.44) {
-        const rock = createRock();
-        rock.position.set(-side * (8.8 + Math.random() * 2), 0, -3);
-        group.add(rock);
+        for (let i = 0; i < 3; i++) {
+            if (Math.random() > 0.2) {
+                const tree = createLowPolyTree();
+                tree.position.set(side * (14 + Math.random() * 20), 0, (Math.random() - 0.5) * 15);
+                group.add(tree);
+            }
+        }
+        
+        if (Math.random() > 0.5) {
+            const cloud = createLowPolyCloud();
+            cloud.position.set(side * (10 + Math.random() * 40), 20 + Math.random() * 15, (Math.random() - 0.5) * 20);
+            group.add(cloud);
+        }
     }
-
-    const banner = createBanner(COURSE_TOPICS[Math.floor(Math.random() * COURSE_TOPICS.length)]);
-    banner.position.set(side * 8.2, 1.7, 10);
-    banner.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-    group.add(banner);
 
     group.position.z = z;
     world.add(group);
     scenery.push(group);
 }
-
 function createCampusBuilding(floors = 2) {
     const group = new THREE.Group();
     const palette = [
@@ -1437,62 +1594,22 @@ function createSelectorStage() {
     stage.visible = false;
     const accentMeshes = [];
 
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(6.2, 64), mats.sidewalk);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0.05, 2.15);
-    floor.receiveShadow = true;
-    stage.add(floor);
-
-    const rim = new THREE.Mesh(
-        new THREE.TorusGeometry(6.2, 0.055, 8, 80),
-        new THREE.MeshBasicMaterial({ color: getCurrentAccentColor(), transparent: true, opacity: 0.78 })
-    );
-    rim.rotation.x = Math.PI / 2;
-    rim.position.set(0, 0.08, 2.15);
-    stage.add(rim);
-    accentMeshes.push(rim);
-
-    const platform = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.15, 1.38, 0.3, 36),
-        cloneTintedMaterial(mats.concrete, 0xf7ead2)
-    );
-    platform.position.set(0, 0.18, 2.15);
-    platform.castShadow = true;
-    platform.receiveShadow = true;
-    stage.add(platform);
-
     const stageLight = new THREE.PointLight(0xffffff, 3.2, 9, 1.7);
     stageLight.position.set(0, 4.4, 5.1);
     stage.add(stageLight);
 
-    [-3.1, 3.1].forEach(x => {
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 12), mats.black);
-        pole.position.set(x, 1.05, 1.15);
-        pole.castShadow = true;
-        stage.add(pole);
-
-        const lamp = new THREE.Mesh(
-            new THREE.SphereGeometry(0.22, 16, 12),
-            new THREE.MeshBasicMaterial({ color: getCurrentAccentColor(), transparent: true, opacity: 0.9 })
-        );
-        lamp.position.set(x, 2.2, 1.15);
-        stage.add(lamp);
-        accentMeshes.push(lamp);
-
-        const beam = new THREE.Mesh(
-            new THREE.ConeGeometry(0.78, 2.7, 24, 1, true),
-            new THREE.MeshBasicMaterial({ color: getCurrentAccentColor(), transparent: true, opacity: 0.1, depthWrite: false })
-        );
-        beam.position.set(x * 0.58, 1.26, 1.72);
-        beam.rotation.z = x > 0 ? -0.34 : 0.34;
-        stage.add(beam);
-        accentMeshes.push(beam);
-    });
-
     const previewGroup = new THREE.Group();
-    previewGroup.position.set(0, 0.35, 2.15);
+    previewGroup.position.set(0, 0.02, 2.15); // Stand on ground directly
     stage.add(previewGroup);
-    stage.userData.preview = { group: previewGroup, root: null, mixer: null, asset: null, platform, rim, accentMeshes };
+    
+    // Provide stub objects for platform and rim to prevent null errors in colors
+    const dummyMat = { color: { setHex: () => {} } };
+    const dummyMesh = { material: dummyMat };
+    
+    stage.userData.preview = { 
+        group: previewGroup, root: null, mixer: null, asset: null, 
+        platform: dummyMesh, rim: dummyMesh, accentMeshes 
+    };
 
     scene.add(stage);
     return stage;
@@ -1599,8 +1716,8 @@ function updateSelectorStage(delta, t) {
     const preview = selectorStage.userData.preview;
     if (state === 'customize') preview?.mixer?.update(delta);
     if (preview?.group) {
-        const targetRotation = state === 'customize' ? Math.sin(t * 1.15) * 0.18 : 0;
-        const targetY = state === 'customize' ? 0.35 + Math.sin(t * 2.2) * 0.035 : 0.35;
+        const targetRotation = 0; // Stop rotation, look directly forward at camera
+        const targetY = 0.02; // Stop bobbing, rest flat on the ground
         preview.group.rotation.y += (targetRotation - preview.group.rotation.y) * (1 - Math.exp(-10 * delta));
         preview.group.position.y += (targetY - preview.group.position.y) * (1 - Math.exp(-10 * delta));
     }
@@ -2283,6 +2400,7 @@ function updatePauseUi() {
     pausePanel.hidden = state !== 'paused';
     hud.dataset.state = state;
     rankingPanel.dataset.state = state;
+    document.getElementById('game-shell').dataset.state = state;
 }
 
 function pauseGame() {

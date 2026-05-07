@@ -47,6 +47,8 @@ button {
     background: var(--sky);
 }
 
+
+
 #game-canvas,
 #game-canvas canvas {
     position: absolute;

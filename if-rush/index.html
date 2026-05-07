@@ -37,7 +37,13 @@
             </div>
         </section>
 
-        <section id="start-screen" class="screen screen-open">
+        <section id="loading-screen" class="screen screen-open" style="z-index: 1000; background: #fff; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+            <div style="width: 60px; height: 60px; border: 6px solid #e0e0e0; border-top-color: #1f8a45; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <h2 style="margin-top: 24px; font-family: 'Inter', sans-serif; color: #1f8a45; font-weight: 700;">Carregando IF Rush...</h2>
+            <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+        </section>
+
+        <section id="start-screen" class="screen" hidden>
             <div class="start-copy">
                 <span class="eyebrow">IF Sudeste MG</span>
                 <h1>IF Rush</h1>
