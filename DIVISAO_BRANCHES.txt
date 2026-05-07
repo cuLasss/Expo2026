@@ -1,6 +1,7 @@
 Divisao inicial das branches
 
-main    - Lucas
+main    - Lucas revisa tudo e arruma erros
+lucas - Lucas
 matheus - Matheus
 alisson - Alisson
 thiago  - Thiago

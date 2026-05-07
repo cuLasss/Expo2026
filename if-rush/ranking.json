@@ -1,3 +1,18 @@
 {
-  "ranking": []
+  "ranking": [
+    {
+      "name": "K",
+      "score": 18705,
+      "time": 36,
+      "area": "IA",
+      "date": "06/05/2026"
+    },
+    {
+      "name": "KKK",
+      "score": 5566,
+      "time": 15,
+      "area": "RED",
+      "date": "06/05/2026"
+    }
+  ]
 }
