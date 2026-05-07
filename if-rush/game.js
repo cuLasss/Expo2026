@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 const mount = document.getElementById('game-canvas');
+const hud = document.getElementById('hud');
 const hudScore = document.getElementById('score');
 const hudBest = document.getElementById('best-score');
 const startScreen = document.getElementById('start-screen');
@@ -18,6 +19,7 @@ const btnResume = document.getElementById('btn-resume');
 const btnPauseMenu = document.getElementById('btn-pause-menu');
 const rankingPanel = document.getElementById('ranking-panel');
 const rankingList = document.getElementById('ranking-list');
+const rankingLimit = rankingPanel.querySelector('.ranking-head span');
 const scoreForm = document.getElementById('score-form');
 const playerNameInput = document.getElementById('player-name');
 const finalScore = document.getElementById('final-score');
@@ -290,6 +292,10 @@ let topicCounts = Object.fromEntries(COURSE_TOPICS.map(topic => [topic.tag, 0]))
 let customIndex = loadCustomizeState();
 let previewLoadToken = 0;
 let playerLoadToken = 0;
+let rankingRefreshTimer = 0;
+let startCameraIntro = 0;
+
+const START_CAMERA_INTRO_DURATION = 0.92;
 
 const liveObjects = [];
 const roadSegments = [];
@@ -604,6 +610,7 @@ for (let i = 0; i < 34; i++) {
 await syncRankingFromJson();
 renderRanking();
 updateCharacterSelection();
+updatePauseUi();
 animate();
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -1590,10 +1597,12 @@ function updateSelectorStage(delta, t) {
     const targetStageX = state === 'menu' ? 3.05 : 0;
     selectorStage.position.x += (targetStageX - selectorStage.position.x) * (1 - Math.exp(-8 * delta));
     const preview = selectorStage.userData.preview;
-    preview?.mixer?.update(delta);
+    if (state === 'customize') preview?.mixer?.update(delta);
     if (preview?.group) {
-        preview.group.rotation.y = Math.sin(t * 1.15) * 0.18;
-        preview.group.position.y = 0.35 + Math.sin(t * 2.2) * 0.035;
+        const targetRotation = state === 'customize' ? Math.sin(t * 1.15) * 0.18 : 0;
+        const targetY = state === 'customize' ? 0.35 + Math.sin(t * 2.2) * 0.035 : 0.35;
+        preview.group.rotation.y += (targetRotation - preview.group.rotation.y) * (1 - Math.exp(-10 * delta));
+        preview.group.position.y += (targetY - preview.group.position.y) * (1 - Math.exp(-10 * delta));
     }
 }
 
@@ -1870,6 +1879,8 @@ function resetGame() {
     combo = 0;
     comboTimer = 0;
     savedCurrentScore = false;
+    rankingRefreshTimer = 0;
+    startCameraIntro = 0;
     laneIndex = 1;
     targetLaneIndex = 1;
     playerVelocityY = 0;
@@ -1891,6 +1902,7 @@ function resetGame() {
 function startGame() {
     resetGame();
     state = 'running';
+    startCameraIntro = START_CAMERA_INTRO_DURATION;
     playPlayerAction('Run');
     customizePanel.hidden = true;
     pausePanel.hidden = true;
@@ -1898,6 +1910,7 @@ function startGame() {
     startScreen.classList.remove('screen-open');
     gameOverScreen.hidden = true;
     updatePauseUi();
+    renderRanking();
 }
 
 function endGame() {
@@ -1907,6 +1920,7 @@ function endGame() {
     resultTitle.textContent = score > bestScore ? 'Novo recorde!' : 'Boa gameplay!';
     gameOverScreen.hidden = false;
     updatePauseUi();
+    renderRanking();
     setTimeout(() => playerNameInput.focus(), 80);
 }
 
@@ -2011,6 +2025,11 @@ function updateRunning(delta, t) {
     distance += speed * delta;
     speed = Math.min(GAMEPLAY.maxSpeed, GAMEPLAY.startSpeed + runTime * GAMEPLAY.acceleration);
     addScore(delta * speed * 4);
+    rankingRefreshTimer -= delta;
+    if (rankingRefreshTimer <= 0) {
+        renderRanking();
+        rankingRefreshTimer = 0.18;
+    }
 
     spawnTimer -= delta;
     collectibleTimer -= delta;
@@ -2154,9 +2173,9 @@ function updateRunning(delta, t) {
     }
 }
 
-function updateScenery(delta) {
+function updateScenery(delta, currentSpeed = speed) {
     for (const group of scenery) {
-        group.position.z += speed * delta;
+        group.position.z += currentSpeed * delta;
         if (group.position.z > 48) {
             group.position.z -= 410;
         }
@@ -2198,10 +2217,17 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
+    const startIntroRatio = state === 'running' && startCameraIntro > 0
+        ? Math.max(0, startCameraIntro / START_CAMERA_INTRO_DURATION)
+        : 0;
+    const startIntroEase = startIntroRatio * startIntroRatio * (3 - 2 * startIntroRatio);
+    if (state === 'running' && startCameraIntro > 0) {
+        startCameraIntro = Math.max(0, startCameraIntro - delta);
+    }
 
-    const visualSpeed = state === 'running' ? speed : state === 'paused' ? 0 : 8;
+    const visualSpeed = state === 'running' ? speed : 0;
     for (const segment of roadSegments) {
-        if (state !== 'running' && state !== 'paused') {
+        if (state !== 'running' && visualSpeed > 0) {
             segment.position.z += visualSpeed * delta;
             if (segment.position.z > 38) segment.position.z -= roadSegments.length * 34;
         }
@@ -2216,23 +2242,29 @@ function animate() {
     if (state !== 'paused') {
         if (player.usesModel) player.mixer.update(delta);
         updateSelectorStage(delta, t);
-        updateScenery(delta);
+        if (state === 'running') updateScenery(delta, speed);
         updateSparks(delta);
         updateComboPopups(delta);
     }
 
     const customizeFocus = new THREE.Vector3(0, 2.08, 2.15);
     const menuFocus = new THREE.Vector3(0, 2.25, -16);
-    const lookAt = state === 'customize'
-        ? customizeFocus
-        : state === 'menu'
-            ? menuFocus
-            : new THREE.Vector3(player.group.position.x * 0.28, 2.2 + player.group.position.y * 0.2, -10);
-    const camTarget = state === 'customize'
-        ? new THREE.Vector3(0, 4.35, 9.2)
-        : state === 'menu'
-            ? new THREE.Vector3(0, 6.2, 17.2)
-            : new THREE.Vector3(player.group.position.x * 0.38, 7.2 + player.group.position.y * 0.18, 15.5);
+    let lookAt;
+    let camTarget;
+    if (state === 'customize') {
+        lookAt = customizeFocus;
+        camTarget = new THREE.Vector3(0, 4.35, 9.2);
+    } else if (state === 'menu') {
+        lookAt = menuFocus;
+        camTarget = new THREE.Vector3(0, 6.2, 17.2);
+    } else {
+        lookAt = new THREE.Vector3(player.group.position.x * 0.28, 2.2 + player.group.position.y * 0.2, -10 + startIntroEase * 6.5);
+        camTarget = new THREE.Vector3(
+            player.group.position.x * 0.38,
+            7.2 + player.group.position.y * 0.18 + startIntroEase * 1.25,
+            15.5 + startIntroEase * 7.4
+        );
+    }
     if (shake > 0) {
         shake -= delta;
         camTarget.x += (Math.random() - 0.5) * shake * 0.55;
@@ -2249,12 +2281,15 @@ function updatePauseUi() {
     btnPause.hidden = !canPause;
     btnPause.textContent = state === 'paused' ? 'Continuar' : 'Pausar';
     pausePanel.hidden = state !== 'paused';
+    hud.dataset.state = state;
+    rankingPanel.dataset.state = state;
 }
 
 function pauseGame() {
     if (state !== 'running') return;
     state = 'paused';
     updatePauseUi();
+    renderRanking();
 }
 
 function resumeGame() {
@@ -2263,6 +2298,7 @@ function resumeGame() {
     clock.getDelta();
     playPlayerAction('Run');
     updatePauseUi();
+    renderRanking();
 }
 
 function showMenu() {
@@ -2277,6 +2313,7 @@ function showMenu() {
     startScreen.classList.add('screen-open');
     updateCharacterSelection({ syncPlayer: false });
     updatePauseUi();
+    renderRanking();
 }
 
 function moveLane(dir) {
@@ -2319,6 +2356,7 @@ function openCustomize() {
     customizePanel.hidden = false;
     updatePauseUi();
     updateCharacterSelection({ syncPlayer: false });
+    renderRanking();
 }
 
 function closeCustomize() {
@@ -2332,6 +2370,7 @@ function closeCustomize() {
     startScreen.classList.add('screen-open');
     updateCharacterSelection();
     updatePauseUi();
+    renderRanking();
 }
 
 window.addEventListener('keydown', event => {
@@ -2452,6 +2491,16 @@ scoreForm.addEventListener('submit', async event => {
     renderRanking();
 });
 
+function compareRankingEntries(a, b) {
+    const scoreDiff = b.score - a.score;
+    if (scoreDiff) return scoreDiff;
+    const timeDiff = b.time - a.time;
+    if (timeDiff) return timeDiff;
+    if (a.current && !b.current) return -1;
+    if (!a.current && b.current) return 1;
+    return String(a.name).localeCompare(String(b.name));
+}
+
 function normalizeRanking(input) {
     const list = Array.isArray(input) ? input : Array.isArray(input?.ranking) ? input.ranking : [];
     return list
@@ -2463,7 +2512,7 @@ function normalizeRanking(input) {
             area: String(entry.area || 'WEB').slice(0, 8).toUpperCase(),
             date: String(entry.date || new Date().toLocaleDateString('pt-BR')),
         }))
-        .sort((a, b) => b.score - a.score)
+        .sort(compareRankingEntries)
         .slice(0, 10);
 }
 
@@ -2525,15 +2574,47 @@ async function saveScore(entry) {
 
 function renderRanking() {
     const ranking = getRanking();
+    const liveMode = state === 'running' || state === 'paused';
+    const limit = liveMode ? 5 : 10;
+    rankingPanel.dataset.mode = liveMode ? 'live' : 'full';
+    rankingLimit.textContent = liveMode ? 'Top 5' : 'Top 10';
+
+    let displayRanking;
+    if (liveMode) {
+        const currentRun = {
+            name: 'VOCE',
+            score: Math.floor(score),
+            time: Math.floor(runTime),
+            date: 'Corrida atual',
+            current: true,
+        };
+        const combined = [...ranking.map(entry => ({ ...entry, current: false })), currentRun].sort(compareRankingEntries);
+        const currentIndex = combined.findIndex(entry => entry.current);
+        if (currentIndex < limit) {
+            displayRanking = combined.slice(0, limit).map((entry, index) => ({ ...entry, rank: index + 1 }));
+        } else {
+            displayRanking = [
+                ...combined.filter(entry => !entry.current).slice(0, limit - 1).map((entry, index) => ({ ...entry, rank: index + 1 })),
+                { ...currentRun, rank: limit },
+            ];
+        }
+    } else {
+        displayRanking = ranking.slice(0, limit).map((entry, index) => ({ ...entry, rank: index + 1 }));
+    }
+
     rankingList.innerHTML = '';
-    if (!ranking.length) {
+    if (!displayRanking.length) {
         const empty = document.createElement('li');
-        empty.innerHTML = '<span>Ninguem<span class="meta">Jogue uma rodada para aparecer aqui</span></span><span class="score-time"><strong>0</strong><span class="time">0s</span></span>';
+        empty.innerHTML = '<span class="rank-number">-</span><span>Ninguem<span class="meta">Jogue uma rodada para aparecer aqui</span></span><span class="score-time"><strong>0</strong><span class="time">0s</span></span>';
         rankingList.appendChild(empty);
         return;
     }
-    for (const entry of ranking) {
+    for (const entry of displayRanking) {
         const li = document.createElement('li');
+        if (entry.current) li.classList.add('current-run');
+        const rank = document.createElement('span');
+        rank.className = 'rank-number';
+        rank.textContent = entry.rank;
         const name = document.createElement('span');
         name.append(document.createTextNode(entry.name));
         const meta = document.createElement('span');
@@ -2548,6 +2629,7 @@ function renderRanking() {
         timeEl.className = 'time';
         timeEl.textContent = `${entry.time}s`;
         scoreWrap.append(scoreEl, timeEl);
+        li.appendChild(rank);
         li.appendChild(name);
         li.appendChild(scoreWrap);
         rankingList.appendChild(li);
