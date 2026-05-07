@@ -16,16 +16,12 @@ const btnMenu = document.getElementById('btn-menu');
 const btnPause = document.getElementById('btn-pause');
 const btnResume = document.getElementById('btn-resume');
 const btnPauseMenu = document.getElementById('btn-pause-menu');
-const btnRanking = document.getElementById('btn-ranking');
 const rankingPanel = document.getElementById('ranking-panel');
-const btnCloseRanking = document.getElementById('btn-close-ranking');
-const btnClearRanking = document.getElementById('btn-clear-ranking');
 const rankingList = document.getElementById('ranking-list');
 const scoreForm = document.getElementById('score-form');
 const playerNameInput = document.getElementById('player-name');
 const finalScore = document.getElementById('final-score');
 const finalTime = document.getElementById('final-time');
-const finalArea = document.getElementById('final-area');
 const resultTitle = document.getElementById('result-title');
 const characterName = document.getElementById('character-name');
 const characterDesc = document.getElementById('character-desc');
@@ -1901,7 +1897,6 @@ function startGame() {
     startScreen.hidden = true;
     startScreen.classList.remove('screen-open');
     gameOverScreen.hidden = true;
-    rankingPanel.hidden = true;
     updatePauseUi();
 }
 
@@ -1909,8 +1904,6 @@ function endGame() {
     state = 'gameover';
     finalScore.textContent = String(Math.floor(score));
     finalTime.textContent = Math.floor(runTime) + 's';
-    const topArea = Object.entries(topicCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'WEB';
-    finalArea.textContent = topArea;
     resultTitle.textContent = score > bestScore ? 'Novo recorde!' : 'Boa gameplay!';
     gameOverScreen.hidden = false;
     updatePauseUi();
@@ -1924,7 +1917,7 @@ function addScore(points) {
 }
 
 function showLearn(topic) {
-    finalArea.dataset.lastTopic = topic.tag;
+    rankingPanel.dataset.lastTopic = topic.tag;
 }
 
 function makeSpark(x, y, z, color = 0xffffff) {
@@ -2280,7 +2273,6 @@ function showMenu() {
     pausePanel.hidden = true;
     customizePanel.hidden = true;
     gameOverScreen.hidden = true;
-    rankingPanel.hidden = true;
     startScreen.hidden = false;
     startScreen.classList.add('screen-open');
     updateCharacterSelection({ syncPlayer: false });
@@ -2319,7 +2311,6 @@ function slide() {
 function openCustomize() {
     state = 'customize';
     startScreen.hidden = true;
-    rankingPanel.hidden = true;
     gameOverScreen.hidden = true;
     player.group.visible = false;
     player.shadow.visible = false;
@@ -2434,18 +2425,6 @@ customizeGender.addEventListener('click', () => {
         updateCharacterSelection();
     }
 });
-btnRanking.addEventListener('click', () => {
-    renderRanking();
-    rankingPanel.hidden = false;
-});
-btnCloseRanking.addEventListener('click', () => {
-    rankingPanel.hidden = true;
-});
-btnClearRanking.addEventListener('click', async () => {
-    setRanking([]);
-    await persistRankingToJson();
-    renderRanking();
-});
 
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.has('customize')) {
@@ -2466,12 +2445,11 @@ scoreForm.addEventListener('submit', async event => {
         name,
         score: Math.floor(score),
         time: Math.floor(runTime),
-        area: finalArea.textContent,
+        area: rankingPanel.dataset.lastTopic || 'WEB',
         date: new Date().toLocaleDateString('pt-BR'),
     });
     playerNameInput.value = '';
     renderRanking();
-    rankingPanel.hidden = false;
 });
 
 function normalizeRanking(input) {
@@ -2550,7 +2528,7 @@ function renderRanking() {
     rankingList.innerHTML = '';
     if (!ranking.length) {
         const empty = document.createElement('li');
-        empty.innerHTML = '<span>Ninguem</span><span class="meta">Jogue uma rodada para aparecer aqui</span><strong>0</strong>';
+        empty.innerHTML = '<span>Ninguem<span class="meta">Jogue uma rodada para aparecer aqui</span></span><span class="score-time"><strong>0</strong><span class="time">0s</span></span>';
         rankingList.appendChild(empty);
         return;
     }
@@ -2560,12 +2538,18 @@ function renderRanking() {
         name.append(document.createTextNode(entry.name));
         const meta = document.createElement('span');
         meta.className = 'meta';
-        meta.textContent = `${entry.area} - ${entry.time}s - ${entry.date}`;
+        meta.textContent = entry.date;
         name.appendChild(meta);
+        const scoreWrap = document.createElement('span');
+        scoreWrap.className = 'score-time';
         const scoreEl = document.createElement('strong');
         scoreEl.textContent = entry.score;
+        const timeEl = document.createElement('span');
+        timeEl.className = 'time';
+        timeEl.textContent = `${entry.time}s`;
+        scoreWrap.append(scoreEl, timeEl);
         li.appendChild(name);
-        li.appendChild(scoreEl);
+        li.appendChild(scoreWrap);
         rankingList.appendChild(li);
     }
 }

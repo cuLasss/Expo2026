@@ -41,7 +41,7 @@
             <div class="start-copy">
                 <span class="eyebrow">IF Sudeste MG</span>
                 <h1>IF Rush</h1>
-                <p>Corra pelo campus, colete areas da Informatica e entre no ranking da banca.</p>
+                <p>Corra em busca do conhecimento e descubra mais sobre o IF.</p>
             </div>
 
             <div class="runner-card" aria-label="Personagem selecionado">
@@ -55,15 +55,6 @@
 
             <div class="start-actions">
                 <button id="btn-start" class="primary-btn" type="button">Jogar Agora</button>
-                <button id="btn-ranking" class="ghost-btn" type="button">Ranking</button>
-            </div>
-
-            <div class="control-strip" aria-hidden="true">
-                <span>A / D</span>
-                <span>Setas</span>
-                <span>Espaco</span>
-                <span>Baixo = cair rapido</span>
-                <span>Swipe</span>
             </div>
         </section>
 
@@ -134,7 +125,6 @@
                     <button id="btn-resume" class="primary-btn" type="button">Continuar</button>
                     <button id="btn-pause-menu" class="ghost-btn" type="button">Menu</button>
                 </div>
-                <span class="pause-tip">Atalho: Esc</span>
             </div>
         </section>
 
@@ -150,10 +140,6 @@
                     <div>
                         <span>Tempo</span>
                         <strong id="final-time">0s</strong>
-                    </div>
-                    <div>
-                        <span>Area forte</span>
-                        <strong id="final-area">Web</strong>
                     </div>
                 </div>
 
@@ -172,13 +158,12 @@
             </div>
         </section>
 
-        <section id="ranking-panel" class="ranking-panel" hidden>
+        <section id="ranking-panel" class="ranking-panel" aria-live="polite">
             <div class="ranking-head">
                 <h2>Ranking Local</h2>
-                <button id="btn-close-ranking" class="icon-btn" type="button" aria-label="Fechar ranking">X</button>
+                <span>Top 10</span>
             </div>
             <ol id="ranking-list"></ol>
-            <button id="btn-clear-ranking" class="danger-btn" type="button">Limpar Ranking</button>
         </section>
     </main>
 

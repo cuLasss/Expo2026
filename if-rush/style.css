@@ -60,7 +60,7 @@ button {
     position: absolute;
     top: 18px;
     left: 18px;
-    right: 18px;
+    right: 390px;
     z-index: 10;
     display: grid;
     grid-template-columns: minmax(210px, 1fr) auto auto auto;
@@ -268,8 +268,6 @@ h1 {
 
 .primary-btn,
 .ghost-btn,
-.danger-btn,
-.icon-btn,
 .selector-btn {
     min-height: 46px;
     border: 0;
@@ -289,19 +287,6 @@ h1 {
     padding: 0 20px;
     color: var(--ink);
     background: var(--paper);
-}
-
-.danger-btn {
-    width: 100%;
-    margin-top: 12px;
-    color: #7f1e18;
-    background: #ffe1dc;
-}
-
-.icon-btn {
-    width: 42px;
-    color: var(--ink);
-    background: rgba(16, 36, 58, 0.08);
 }
 
 .selector-btn {
@@ -472,43 +457,12 @@ h1 {
     gap: 12px;
 }
 
-.pause-tip {
-    display: block;
-    margin-top: 16px;
-    color: rgba(16, 36, 58, 0.58);
-    font-size: 0.82rem;
-    font-weight: 900;
-    text-transform: uppercase;
-}
-
 .primary-btn:hover,
 .ghost-btn:hover,
-.danger-btn:hover,
-.icon-btn:hover,
 .selector-btn:hover,
 .pause-btn:hover {
     transform: translateY(-1px);
     filter: brightness(1.03);
-}
-
-.control-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 20px;
-}
-
-.control-strip span {
-    display: inline-flex;
-    align-items: center;
-    min-height: 32px;
-    padding: 0 12px;
-    border-radius: 8px;
-    color: white;
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    font-size: 0.86rem;
-    font-weight: 800;
 }
 
 #game-over {
@@ -532,7 +486,7 @@ h1 {
 
 .result-stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     margin: 20px 0;
 }
@@ -591,15 +545,13 @@ h1 {
 .ranking-panel {
     position: absolute;
     right: 18px;
-    top: 86px;
+    top: 18px;
     z-index: 24;
-    width: min(360px, calc(100% - 36px));
-    padding: 16px;
-    border-radius: 8px;
-}
-
-.ranking-panel[hidden] {
-    display: none;
+    width: min(340px, calc(100% - 36px));
+    max-height: calc(100vh - 36px);
+    padding: 14px;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
 .ranking-head {
@@ -610,14 +562,27 @@ h1 {
 }
 
 .ranking-head h2 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 900;
+}
+
+.ranking-head span {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 999px;
+    color: var(--ink);
+    background: var(--gold);
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
 }
 
 #ranking-list {
     display: grid;
-    gap: 8px;
-    margin: 14px 0 0;
+    gap: 6px;
+    margin: 12px 0 0;
     padding: 0;
     list-style: none;
     counter-reset: rank;
@@ -626,11 +591,11 @@ h1 {
 #ranking-list li {
     counter-increment: rank;
     display: grid;
-    grid-template-columns: 34px 1fr auto;
-    gap: 10px;
+    grid-template-columns: 30px 1fr auto;
+    gap: 8px;
     align-items: center;
-    min-height: 48px;
-    padding: 8px 10px;
+    min-height: 42px;
+    padding: 7px 9px;
     border-radius: 8px;
     background: rgba(16, 36, 58, 0.07);
     font-weight: 900;
@@ -638,8 +603,8 @@ h1 {
 
 #ranking-list li::before {
     content: counter(rank);
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     display: grid;
     place-items: center;
     border-radius: 8px;
@@ -651,6 +616,24 @@ h1 {
     display: block;
     font-size: 0.72rem;
     color: rgba(16, 36, 58, 0.62);
+    text-transform: uppercase;
+}
+
+#ranking-list .score-time {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+}
+
+#ranking-list .score-time strong {
+    line-height: 1;
+    color: var(--if-green-deep);
+}
+
+#ranking-list .time {
+    color: rgba(16, 36, 58, 0.58);
+    font-size: 0.72rem;
+    font-weight: 900;
     text-transform: uppercase;
 }
 
@@ -732,7 +715,7 @@ h1 {
     }
 
     .result-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
     }
 
     .score-form div {
@@ -740,9 +723,12 @@ h1 {
     }
 
     .ranking-panel {
-        top: 76px;
+        top: auto;
         right: 10px;
         left: 10px;
+        bottom: 10px;
         width: auto;
+        max-height: 32vh;
+        overflow: auto;
     }
 }
