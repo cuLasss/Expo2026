@@ -17,10 +17,15 @@ const btnMenu = document.getElementById('btn-menu');
 const btnPause = document.getElementById('btn-pause');
 const btnResume = document.getElementById('btn-resume');
 const btnPauseMenu = document.getElementById('btn-pause-menu');
+const newRunConfirm = document.getElementById('new-run-confirm');
+const btnConfirmRetry = document.getElementById('btn-confirm-retry');
+const btnCancelRetry = document.getElementById('btn-cancel-retry');
 const rankingPanel = document.getElementById('ranking-panel');
 const rankingList = document.getElementById('ranking-list');
 const rankingLimit = rankingPanel.querySelector('.ranking-head span');
 const scoreForm = document.getElementById('score-form');
+const scoreFormLabel = scoreForm.querySelector('label');
+const scoreFormSubmit = scoreForm.querySelector('button[type="submit"]');
 const playerNameInput = document.getElementById('player-name');
 const finalScore = document.getElementById('final-score');
 const finalTime = document.getElementById('final-time');
@@ -31,12 +36,19 @@ const btnCustomize = document.getElementById('btn-customize');
 const customizePanel = document.getElementById('customize-panel');
 const customizeClose = document.getElementById('customize-close');
 const customizeDone = document.getElementById('customize-done');
-const customizeGender = document.getElementById('customize-gender');
+const customizeGenderRow = document.getElementById('customize-gender-row');
+const customizeGenderName = document.getElementById('customize-gender-name');
 const customizeCharacterName = document.getElementById('customize-character-name');
 const customizeSkinName = document.getElementById('customize-skin-name');
 const customizeHairName = document.getElementById('customize-hair-name');
 const customizeShirtName = document.getElementById('customize-shirt-name');
 const customizePantsName = document.getElementById('customize-pants-name');
+const customizeRows = {
+    skin: document.getElementById('customize-skin-row'),
+    hair: document.getElementById('customize-hair-row'),
+    shirt: document.getElementById('customize-shirt-row'),
+    pants: document.getElementById('customize-pants-row'),
+};
 
 const STORAGE_KEY = 'if-rush-ranking-v1';
 const RANKING_ENDPOINT = 'ranking.json';
@@ -99,7 +111,6 @@ const PRESETS = {
         { label: 'Aluno Casual 3', file: 'Casual3_Male.gltf' },
         { label: 'Aluna Casual 3', file: 'Casual3_Female.gltf' },
         { label: 'Aluno Careca', file: 'Casual_Bald.gltf' },
-        { label: 'Personagem Base', file: 'BaseCharacter.gltf' },
         { label: 'Prof. de Terno', file: 'Suit_Male.gltf' },
         { label: 'Profa. de Terno', file: 'Suit_Female.gltf' },
         { label: 'Prof. Veterano', file: 'OldClassy_Male.gltf' },
@@ -190,8 +201,8 @@ const MATERIAL_TARGETS = {
     skin: [['Skin', 'Bodymat']],
     hair: [['Hair', 'Hairmat']],
     eyebrow: [['Face']],
-    shirt: [['Topmat', 'Shirt', 'TShirt'], ['Clothes', 'Main'], ['Armor_Light']],
-    pants: [['Pants', 'Bottommat'], ['Trousers', 'Shorts', 'Skirt', 'Bottom'], ['Armor_Dark', 'DarkClothes'], ['Black'], ['Main'], ['Clothes']],
+    shirt: [['Topmat', 'Shirt', 'TShirt'], ['Clothes'], ['Armor', 'Armor_Light'], ['Main']],
+    pants: [['Pants', 'Bottommat'], ['Trousers', 'Shorts', 'Skirt', 'Bottom']],
 };
 
 const OBSTACLE_TYPES = [
@@ -224,7 +235,7 @@ const GAMEPLAY = {
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x6abce2);
+scene.background = new THREE.Color(0x7ecff4);
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(0, 7.2, 15.5);
 
@@ -270,7 +281,10 @@ let targetLaneIndex = 1;
 let playerVelocityY = 0;
 let isSliding = false;
 let isFastDropping = false;
+let pendingGroundRoll = false;
 let slideTimer = 0;
+let slideElapsed = 0;
+let slideVisualDuration = GAMEPLAY.slideDuration;
 let score = 0;
 let distance = 0;
 let runTime = 0;
@@ -283,6 +297,9 @@ let shake = 0;
 let combo = 0;
 let comboTimer = 0;
 let savedCurrentScore = false;
+let currentRunRank = null;
+let rankingEditorEnabled = false;
+const activeKeys = new Set();
 let rankingCache = getStoredRanking();
 let rankingUsesJson = false;
 let bestScore = rankingCache[0]?.score || 0;
@@ -294,13 +311,27 @@ let rankingRefreshTimer = 0;
 let startCameraIntro = 0;
 
 const START_CAMERA_INTRO_DURATION = 0.92;
+const SCENERY_COUNT = 9;
+const SCENERY_SPACING = 14;
+const SCENERY_START_Z = 18;
+const SCENERY_RECYCLE_Z = 24;
+const SCENERY_LOOP_LENGTH = SCENERY_COUNT * SCENERY_SPACING;
+const SCENERY_SPEED_FACTOR = 0.82;
+const CLOUD_COUNT = 8;
+const CLOUD_SPACING = 26;
+const CLOUD_LOOP_LENGTH = CLOUD_COUNT * CLOUD_SPACING;
+const CLOUD_RECYCLE_Z = 82;
+const CLOUD_START_Z = CLOUD_RECYCLE_Z - CLOUD_LOOP_LENGTH;
+const CLOUD_SPEED_FACTOR = 0.44;
 
 const liveObjects = [];
 const roadSegments = [];
 const scenery = [];
+const cloudScenery = [];
 const sparks = [];
 const comboPopups = [];
 const labelTextureCache = new Map();
+const coinTextureCache = new Map();
 const characterCache = new Map();
 const loaderGLTF = new GLTFLoader();
 const loaderFBX = new FBXLoader();
@@ -421,6 +452,8 @@ function clonePlayerModel(asset = gameAssets.player) {
     enableModelShadows(root);
     fitObjectToBox(root, { height: 3.35 });
     root.rotation.y = Math.PI;
+    root.userData.basePosition = root.position.clone();
+    root.userData.baseRotation = root.rotation.clone();
     applyCustomizationToRoot(root);
     return root;
 }
@@ -438,6 +471,23 @@ function tintMats(root, names, colorHex) {
                 material.color.setHex(colorHex);
                 count++;
             }
+        });
+    });
+    return count;
+}
+
+function countMatchingMats(root, tiers) {
+    if (!root) return 0;
+    let count = 0;
+    root.traverse(child => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach(material => {
+            const matName = material?.name || '';
+            const matches = tiers.some(names =>
+                names.some(name => matName === name || matName.toLowerCase().includes(name.toLowerCase()))
+            );
+            if (matches) count++;
         });
     });
     return count;
@@ -529,27 +579,11 @@ function styleImportedBuilding(root, palette) {
 
 async function loadGameAssets() {
     const initialCharacter = getCurrentCharacter().file;
-    const [playerResult, treeResults, bushResults, rockResults, buildingResults] = await Promise.all([
+    const [playerResult, buildingResults] = await Promise.all([
         loadCharacterAsset(initialCharacter).catch(err => {
             console.warn('[IF Rush] Player GLTF falhou, usando fallback procedural:', err);
             return null;
         }),
-        Promise.all([
-            'CommonTree_1.gltf',
-            'CommonTree_3.gltf',
-            'CommonTree_5.gltf',
-            'Pine_2.gltf',
-        ].map(file => loadGLTFAsset(NATURE_ROOT + file).catch(() => null))),
-        Promise.all([
-            'Bush_Common.gltf',
-            'Bush_Common_Flowers.gltf',
-            'Flower_3_Group.gltf',
-        ].map(file => loadGLTFAsset(NATURE_ROOT + file).catch(() => null))),
-        Promise.all([
-            'Rock_Medium_1.gltf',
-            'Rock_Medium_2.gltf',
-            'Rock_Medium_3.gltf',
-        ].map(file => loadGLTFAsset(NATURE_ROOT + file).catch(() => null))),
         Promise.all([
             '1Story_GableRoof.fbx',
             '2Story_Wide.fbx',
@@ -562,9 +596,9 @@ async function loadGameAssets() {
     ]);
 
     gameAssets.player = playerResult;
-    gameAssets.trees = treeResults.filter(Boolean).map(item => item.scene);
-    gameAssets.bushes = bushResults.filter(Boolean).map(item => item.scene);
-    gameAssets.rocks = rockResults.filter(Boolean).map(item => item.scene);
+    gameAssets.trees = [];
+    gameAssets.bushes = [];
+    gameAssets.rocks = [];
     gameAssets.buildings = buildingResults.filter(Boolean);
 }
 
@@ -572,16 +606,17 @@ hudBest.textContent = String(bestScore);
 
 const treeBarkMap = makeNoiseTexture('#a37446', '#6c4328', 70, 512);
 const treeLeafMap = makeNoiseTexture('#39c970', '#1d994e', 75, 512);
+const stylizedGrassMap = makeLowPolyPatchTexture('#77c649', '#599d34', '#9cdf70', 10, 24, 768, 160);
 
 const mats = {
-    road: makeAmbientMaterial('Asphalt022', 2.1, 9.5, { color: 0x9aa0a4, normalScale: 0.34, roughness: 0.82 }),
-    sidewalk: makeAmbientMaterial('PavingStones092', 2.2, 12, { color: 0xf6e9d2, normalScale: 0.5, roughness: 0.9 }),
-    grass: makeAmbientMaterial('Grass001', 12, 38, { color: 0x7bcf6a, normalScale: 0.42, roughness: 0.96 }),
-    buildingWall: makeAmbientMaterial('Bricks097', 1.8, 3.2, { color: 0xf5e1c3, normalScale: 0.5, roughness: 0.88 }),
-    roof: makeAmbientMaterial('RoofingTiles013A', 2.6, 2.6, { color: 0xc84e3f, normalScale: 0.52, roughness: 0.74 }),
-    concrete: makeAmbientMaterial('Concrete032', 3.2, 3.2, { color: 0xf0eadf, normalScale: 0.35, roughness: 0.9 }),
-    curb: makeAmbientMaterial('Concrete032', 1.2, 8, { color: 0xfffbeb, normalScale: 0.22, roughness: 0.9 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x9adcf4, roughness: 0.2, metalness: 0.02 }),
+    road: new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.96 }),
+    sidewalk: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeTileTexture('#f4dfc7', '#d3b89a'), roughness: 0.98 }),
+    grass: new THREE.MeshStandardMaterial({ color: 0xffffff, map: stylizedGrassMap, roughness: 0.99 }),
+    buildingWall: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeBuildingWallTexture(), roughness: 0.98 }),
+    roof: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeRoofTexture(), roughness: 0.95 }),
+    concrete: new THREE.MeshStandardMaterial({ color: 0xf7efe1, map: makeTileTexture('#f3e5cf', '#d8bea0'), roughness: 0.98 }),
+    curb: new THREE.MeshStandardMaterial({ color: 0xfffaf0, map: makeTileTexture('#f3e5cf', '#d8bea0'), roughness: 0.98 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0xd4dee5, roughness: 0.28, metalness: 0.01, transparent: true, opacity: 0.92 }),
     white: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }),
     black: new THREE.MeshStandardMaterial({ color: 0x172033, roughness: 0.62 }),
     green: new THREE.MeshStandardMaterial({ color: 0x1f8a45, roughness: 0.58 }),
@@ -602,8 +637,11 @@ player.shadow.visible = false;
 selectorStage.visible = true;
 
 createTrack();
-for (let i = 0; i < 34; i++) {
-    addSceneryCluster(-18 - i * 13);
+for (let i = 0; i < SCENERY_COUNT; i++) {
+    addSceneryCluster(SCENERY_START_Z - i * SCENERY_SPACING);
+}
+for (let i = 0; i < CLOUD_COUNT; i++) {
+    addCloudCluster(CLOUD_START_Z + i * CLOUD_SPACING, i);
 }
 scene.add(createInstitute());
 await syncRankingFromJson();
@@ -642,6 +680,53 @@ function finishTexture(canvas, repeatX = 1, repeatY = 1) {
     return tex;
 }
 
+function makeLowPolyPatchTexture(
+    base = '#78c44e',
+    shadow = '#5ca338',
+    highlight = '#9adf69',
+    repeatX = 10,
+    repeatY = 22,
+    size = 768,
+    facets = 140
+) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, size, size);
+
+    for (let i = 0; i < facets; i++) {
+        const cx = Math.random() * size;
+        const cy = Math.random() * size;
+        const radius = 18 + Math.random() * 68;
+        const sides = 4 + Math.floor(Math.random() * 4);
+        ctx.beginPath();
+        for (let point = 0; point < sides; point++) {
+            const angle = (Math.PI * 2 * point) / sides + Math.random() * 0.42;
+            const r = radius * (0.72 + Math.random() * 0.42);
+            const x = cx + Math.cos(angle) * r;
+            const y = cy + Math.sin(angle) * r;
+            if (point === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = i % 5 === 0 ? highlight : i % 2 === 0 ? shadow : base;
+        ctx.globalAlpha = i % 5 === 0 ? 0.22 : 0.16;
+        ctx.fill();
+    }
+
+    ctx.globalAlpha = 0.16;
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, 'rgba(255,255,255,0.22)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalAlpha = 1;
+
+    return finishTexture(canvas, repeatX, repeatY);
+}
+
 function makeRoadTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
@@ -655,13 +740,13 @@ function makeRoadTexture() {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.globalAlpha = 0.18;
-    for (let i = 0; i < 2800; i++) {
+    ctx.globalAlpha = 0.09;
+    for (let i = 0; i < 720; i++) {
         const x = (i * 73) % canvas.width;
         const y = (i * 131) % canvas.height;
-        const shade = i % 4 ? '#ffffff' : '#162432';
+        const shade = i % 5 ? '#ffffff' : '#223241';
         ctx.fillStyle = shade;
-        ctx.fillRect(x, y, 2 + (i % 5), 1 + (i % 3));
+        ctx.fillRect(x, y, 5 + (i % 13), 1 + (i % 2));
     }
     ctx.globalAlpha = 1;
 
@@ -673,25 +758,6 @@ function makeRoadTexture() {
         ctx.bezierCurveTo(240, y + 12, 680, y - 10, canvas.width, y + 4);
         ctx.stroke();
     }
-
-    ctx.fillStyle = '#ffe36d';
-    for (const x of [canvas.width * 0.365, canvas.width * 0.635]) {
-        for (let y = -80; y < canvas.height + 140; y += 174) {
-            roundedRect(ctx, x - 11, y, 22, 92, 11);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(255,255,255,0.35)';
-            roundedRect(ctx, x - 8, y + 8, 6, 70, 5);
-            ctx.fill();
-            ctx.fillStyle = '#ffe36d';
-        }
-    }
-
-    ctx.fillStyle = '#fff9e8';
-    ctx.fillRect(34, 0, 14, canvas.height);
-    ctx.fillRect(canvas.width - 48, 0, 14, canvas.height);
-    ctx.fillStyle = 'rgba(31, 138, 69, 0.9)';
-    ctx.fillRect(0, 0, 10, canvas.height);
-    ctx.fillRect(canvas.width - 10, 0, 10, canvas.height);
 
     return finishTexture(canvas, 1, 1);
 }
@@ -970,6 +1036,65 @@ function makeLabelTexture(label, bg = '#1f8a45', fg = '#ffffff') {
     return tex;
 }
 
+function makeCoinFaceTexture(mark = 'IF', bg = '#ffc94a', fg = '#fff8dc') {
+    const cacheKey = `${mark}|${bg}|${fg}`;
+    if (coinTextureCache.has(cacheKey)) return coinTextureCache.get(cacheKey);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+
+    const grad = ctx.createRadialGradient(92, 68, 28, 128, 128, 118);
+    grad.addColorStop(0, '#fff1a8');
+    grad.addColorStop(0.42, bg);
+    grad.addColorStop(1, mark === 'BTC' ? '#c76b09' : '#c58c18');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(128, 128, 112, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(103, 63, 6, 0.48)';
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.arc(128, 128, 102, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.36)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(128, 128, 82, Math.PI * 1.08, Math.PI * 1.72);
+    ctx.stroke();
+
+    ctx.fillStyle = fg;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (mark === 'BTC') {
+        ctx.font = '900 104px Arial, sans-serif';
+        ctx.fillText('B', 128, 132);
+        ctx.strokeStyle = fg;
+        ctx.lineWidth = 9;
+        ctx.lineCap = 'round';
+        for (const x of [111, 129]) {
+            ctx.beginPath();
+            ctx.moveTo(x, 62);
+            ctx.lineTo(x, 194);
+            ctx.stroke();
+        }
+        ctx.fillText('B', 128, 132);
+    } else {
+        ctx.font = '900 78px Outfit, Arial, sans-serif';
+        ctx.fillText(mark, 128, 132);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = maxAnisotropy;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    coinTextureCache.set(cacheKey, tex);
+    return tex;
+}
+
 function addRoadMarkings(segment) {
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xfff6d2, transparent: true, opacity: 0.92 });
     const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.82 });
@@ -989,12 +1114,35 @@ function addRoadMarkings(segment) {
     }
 }
 
+function addMovingSideHills(segment, segmentIndex) {
+    for (const side of [-1, 1]) {
+        const ridge = new THREE.Mesh(new THREE.IcosahedronGeometry(13.5, 1), mats.grass);
+        ridge.position.set(side * 54, -1.25, ((segmentIndex * 13) % 24) - 12);
+        ridge.scale.set(2.15, 0.34, 1.65);
+        ridge.rotation.y = side * (0.28 + segmentIndex * 0.11);
+        ridge.castShadow = true;
+        ridge.receiveShadow = true;
+        segment.add(ridge);
+
+        for (let i = 0; i < 3; i++) {
+            const hill = new THREE.Mesh(new THREE.IcosahedronGeometry(7.5 + i * 1.9, 1), mats.grass);
+            const stagger = ((segmentIndex * 19 + i * 9) % 33) - 16;
+            hill.position.set(side * (30 + i * 10), -1.08 - i * 0.36, stagger);
+            hill.scale.set(1.45 + i * 0.23, 0.38 + i * 0.04, 1.24 + i * 0.16);
+            hill.rotation.y = side * (0.35 + segmentIndex * 0.17 + i * 0.48);
+            hill.castShadow = true;
+            hill.receiveShadow = true;
+            segment.add(hill);
+        }
+    }
+}
+
 function createTrack() {
     for (let i = 0; i < 8; i++) {
         const segment = new THREE.Group();
         const z = -i * 34;
 
-        const grass = new THREE.Mesh(new THREE.PlaneGeometry(42, 36), mats.grass);
+        const grass = new THREE.Mesh(new THREE.PlaneGeometry(150, 36), mats.grass);
         grass.rotation.x = -Math.PI / 2;
         grass.position.y = -0.035;
         grass.receiveShadow = true;
@@ -1007,6 +1155,7 @@ function createTrack() {
         segment.add(road);
 
         addRoadMarkings(segment);
+        addMovingSideHills(segment, i);
 
         [-9.3, 9.3].forEach(x => {
             const walk = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 36), mats.sidewalk);
@@ -1068,206 +1217,329 @@ function createLowPolyTree() {
     return group;
 }
 
+function registerGroundSpawn(object) {
+    object.userData.baseScale = object.scale.clone();
+    object.userData.baseY = object.position.y;
+    object.userData.growProgress = 1;
+    return object;
+}
+
+function resetGroundSpawn(group) {
+    let index = 0;
+    for (const child of group.children) {
+        if (!child.userData.baseScale) continue;
+        child.userData.growProgress = -index * 0.09;
+        child.scale.set(
+            child.userData.baseScale.x * 0.68,
+            child.userData.baseScale.y * 0.04,
+            child.userData.baseScale.z * 0.68
+        );
+        child.position.y = child.userData.baseY - 0.16;
+        index += 1;
+    }
+}
+
+function updateGroundSpawn(group, delta) {
+    for (const child of group.children) {
+        const baseScale = child.userData.baseScale;
+        if (!baseScale || child.userData.growProgress >= 1) continue;
+        child.userData.growProgress = Math.min(1, child.userData.growProgress + delta * 1.35);
+        const progress = Math.max(0, child.userData.growProgress);
+        const ease = progress * progress * (3 - 2 * progress);
+        const widthScale = 0.68 + ease * 0.32;
+        child.scale.set(
+            baseScale.x * widthScale,
+            baseScale.y * Math.max(0.04, ease),
+            baseScale.z * widthScale
+        );
+        child.position.y = child.userData.baseY - (1 - ease) * 0.16;
+    }
+}
+
 function createInstitute() {
     const group = new THREE.Group();
-    // Materials
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5f2eb, roughness: 0.9, flatShading: true });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x8a3822, roughness: 0.8, flatShading: true });
-    const trimMat = new THREE.MeshStandardMaterial({ color: 0x5e1f18, roughness: 0.9, flatShading: true });
-    const windowMat = new THREE.MeshStandardMaterial({ color: 0x3d4b5c, roughness: 0.3, flatShading: true });
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 1.0, flatShading: true });
+    const wallMat = cloneTintedMaterial(mats.buildingWall, 0xfffbef);
+    const roofMat = cloneTintedMaterial(mats.roof, 0xc86a44);
+    roofMat.side = THREE.DoubleSide;
+    const towerRoofMat = cloneTintedMaterial(mats.roof, 0xe0713f);
+    towerRoofMat.side = THREE.DoubleSide;
+    const timberMat = new THREE.MeshStandardMaterial({ color: 0x3b2a23, roughness: 0.92 });
+    const timberLightMat = new THREE.MeshStandardMaterial({ color: 0x76523f, roughness: 0.86 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf7f2e8, roughness: 0.72 });
+    const glassMat = new THREE.MeshStandardMaterial({
+        color: 0xcbd7d8,
+        roughness: 0.34,
+        metalness: 0.01,
+        transparent: true,
+        opacity: 0.92,
+    });
+    const clockMat = new THREE.MeshStandardMaterial({ color: 0xf1d5a8, roughness: 0.82 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x31443c, roughness: 0.78 });
 
-    const addTimber = (w, h, x, y, z, rotZ = 0) => {
-        const timber = new THREE.Mesh(new THREE.PlaneGeometry(w, h), trimMat);
-        timber.position.set(x, y, z);
-        timber.rotation.z = rotZ;
-        group.add(timber);
+    const frontZ = (z, depth) => z + depth / 2 + 0.08;
+
+    const addPlane = (w, h, x, y, z, mat, rotZ = 0, order = 2) => {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+        mesh.position.set(x, y, z);
+        mesh.rotation.z = rotZ;
+        mesh.renderOrder = order;
+        group.add(mesh);
+        return mesh;
     };
 
-    const addWin = (w, h, x, y, z) => {
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(w, h), windowMat);
-        win.position.set(x, y, z);
-        group.add(win);
+    const addTrimBox = (w, h, d, x, y, z, mat = timberMat) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+        return mesh;
     };
 
-    // 1. LEFT GABLE BUILDING
-    const leftBldg = new THREE.Mesh(new THREE.BoxGeometry(16, 18, 14), wallMat);
-    leftBldg.position.set(-30, 9, 0);
-    leftBldg.castShadow = true;
-    group.add(leftBldg);
+    const makeGableRoof = (width, depth, height, mat) => {
+        const hw = width / 2;
+        const hd = depth / 2;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            -hw, 0, -hd,
+             hw, 0, -hd,
+             hw, 0,  hd,
+            -hw, 0,  hd,
+            -hw, height, 0,
+             hw, height, 0,
+        ], 3));
+        geometry.setIndex([
+            0, 4, 5, 0, 5, 1,
+            3, 2, 5, 3, 5, 4,
+            0, 3, 4,
+            1, 5, 2,
+            0, 1, 2, 0, 2, 3,
+        ]);
+        geometry.computeVertexNormals();
+        return new THREE.Mesh(geometry, mat);
+    };
 
-    const leftRoof = new THREE.Mesh(new THREE.ConeGeometry(14, 8, 4), roofMat);
-    leftRoof.rotation.y = Math.PI / 4;
-    leftRoof.position.set(-30, 22, 0);
-    group.add(leftRoof);
+    const addGableRoof = (width, depth, height, x, y, z, mat = roofMat) => {
+        const roof = makeGableRoof(width, depth, height, mat);
+        roof.position.set(x, y, z);
+        roof.castShadow = true;
+        roof.receiveShadow = true;
+        group.add(roof);
+        addTrimBox(width + 0.8, 0.25, 0.42, x, y + 0.05, z + depth / 2 + 0.16, timberLightMat);
+        return roof;
+    };
 
-    addTimber(16, 0.5, -30, 18, 7.05); // base
-    addTimber(0.5, 8, -30, 22, 7.05); // center
-    addTimber(0.5, 12, -34, 20, 7.05, 0.6); // diag
-    addTimber(0.5, 12, -26, 20, 7.05, -0.6); // diag
-    
-    addWin(3, 5, -34, 12, 7.05);
-    addWin(3, 5, -30, 12, 7.05);
-    addWin(3, 5, -26, 12, 7.05);
-    addWin(3, 5, -34, 5, 7.05);
-    addWin(3, 5, -30, 5, 7.05);
-    addWin(3, 5, -26, 5, 7.05);
+    const makeHippedRoof = (width, depth, height, mat) => {
+        const hw = width / 2;
+        const hd = depth / 2;
+        const ridge = hw * 0.48;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            -hw, 0, -hd,
+             hw, 0, -hd,
+             hw, 0,  hd,
+            -hw, 0,  hd,
+            -ridge, height, 0,
+             ridge, height, 0,
+        ], 3));
+        geometry.setIndex([
+            0, 4, 5, 0, 5, 1,
+            3, 2, 5, 3, 5, 4,
+            0, 3, 4,
+            1, 5, 2,
+            0, 1, 2, 0, 2, 3,
+        ]);
+        geometry.computeVertexNormals();
+        return new THREE.Mesh(geometry, mat);
+    };
 
-    // 2. MIDDLE WING
-    const midWing = new THREE.Mesh(new THREE.BoxGeometry(34, 12, 10), wallMat);
-    midWing.position.set(-5, 6, 0);
-    midWing.castShadow = true;
-    group.add(midWing);
+    const addHippedRoof = (width, depth, height, x, y, z, mat = roofMat) => {
+        const roof = makeHippedRoof(width, depth, height, mat);
+        roof.position.set(x, y, z);
+        roof.castShadow = true;
+        roof.receiveShadow = true;
+        group.add(roof);
+        addTrimBox(width + 0.65, 0.22, 0.36, x, y + 0.08, z + depth / 2 + 0.13, timberLightMat);
+        return roof;
+    };
 
-    const midRoofMesh = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 36, 4), roofMat);
-    midRoofMesh.rotation.x = Math.PI / 2;
-    midRoofMesh.rotation.z = Math.PI / 2;
-    midRoofMesh.rotation.y = Math.PI / 4;
-    midRoofMesh.position.set(-5, 15, 0);
-    group.add(midRoofMesh);
+    const addWindow = (x, y, z, w = 1.5, h = 2.4) => {
+        addPlane(w + 0.38, h + 0.46, x, y, z, timberMat, 0, 2);
+        addPlane(w + 0.2, h + 0.28, x, y, z + 0.015, frameMat, 0, 3);
+        addPlane(w, h, x, y, z + 0.03, glassMat, 0, 4);
+        addPlane(0.08, h, x, y, z + 0.045, timberMat, 0, 5);
+        addPlane(w, 0.08, x, y, z + 0.05, timberMat, 0, 5);
+        addPlane(w + 0.55, 0.16, x, y - h / 2 - 0.26, z + 0.04, timberLightMat, 0, 5);
+    };
 
-    for (let i = 0; i < 6; i++) addWin(2.5, 6, -20 + i * 5, 6, 5.05);
+    const addTimberPattern = (x, y, z, width, height) => {
+        addPlane(width, 0.22, x, y + height / 2, z, timberMat);
+        addPlane(width, 0.22, x, y - height / 2, z, timberMat);
+        addPlane(0.22, height, x - width / 2, y, z, timberMat);
+        addPlane(0.22, height, x + width / 2, y, z, timberMat);
+        addPlane(0.2, height * 1.08, x - width * 0.24, y, z + 0.012, timberMat, -0.34);
+        addPlane(0.2, height * 1.08, x + width * 0.24, y, z + 0.012, timberMat, 0.34);
+    };
 
-    // 3. FRONT PROJECTING ENTRANCE
-    const frontProj = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 10), wallMat);
-    frontProj.position.set(2, 7, 6);
-    frontProj.castShadow = true;
-    group.add(frontProj);
+    const addBody = (w, h, d, x, y, z) => {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+        body.position.set(x, y, z);
+        body.castShadow = true;
+        body.receiveShadow = true;
+        group.add(body);
+        return body;
+    };
 
-    const frontProjRoof = new THREE.Mesh(new THREE.ConeGeometry(11, 7, 4), roofMat);
-    frontProjRoof.rotation.y = Math.PI / 4;
-    frontProjRoof.position.set(2, 17.5, 6);
-    group.add(frontProjRoof);
+    const frontWingZ = -176.5;
+    const leftGableZ = -174.2;
+    const centerBlockZ = -181.3;
+    const rightGableZ = -174.6;
+    const porchZ = -171.7;
+    const towerZ = -180.5;
 
-    addWin(2.5, 5, -1, 10, 11.05);
-    addWin(2.5, 5, 2, 10, 11.05);
-    addWin(2.5, 5, 5, 10, 11.05);
-    addWin(4, 5, 2, 2.5, 11.05); // Door
+    // Long colonial facade, kept behind the road end so it never fills the track.
+    addBody(54, 6.7, 6.4, -3, 3.35, frontWingZ);
+    addGableRoof(56, 8.4, 2.8, -3, 6.85, frontWingZ);
+    addTrimBox(55, 0.22, 0.28, -3, 6.25, frontZ(frontWingZ, 6.4) + 0.02, timberLightMat);
+    addTrimBox(55, 0.18, 0.25, -3, 1.0, frontZ(frontWingZ, 6.4) + 0.02, timberLightMat);
 
-    // 4. RIGHT WING
-    const rightWing = new THREE.Mesh(new THREE.BoxGeometry(16, 12, 10), wallMat);
-    rightWing.position.set(15, 6, 0);
-    rightWing.castShadow = true;
-    group.add(rightWing);
+    // Left fronton: one of the most recognizable IF Barbacena shapes.
+    addBody(11.8, 9.6, 7.0, -27.2, 4.8, leftGableZ);
+    addGableRoof(13.5, 8.5, 4.2, -27.2, 9.75, leftGableZ, roofMat);
+    addTimberPattern(-27.2, 7.65, frontZ(leftGableZ, 7.0), 10.4, 5.0);
+    addPlane(4.6, 0.22, -27.2, 11.55, frontZ(leftGableZ, 7.0) + 0.03, timberMat, 0.58, 6);
+    addPlane(4.6, 0.22, -27.2, 11.55, frontZ(leftGableZ, 7.0) + 0.04, timberMat, -0.58, 6);
 
-    const rightRoofMesh = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 16, 4), roofMat);
-    rightRoofMesh.rotation.x = Math.PI / 2;
-    rightRoofMesh.rotation.z = Math.PI / 2;
-    rightRoofMesh.rotation.y = Math.PI / 4;
-    rightRoofMesh.position.set(15, 15, 0);
-    group.add(rightRoofMesh);
+    // Taller central volume with hipped roof, like the historic main block.
+    addBody(16.8, 13.6, 8.8, -3.8, 6.8, centerBlockZ);
+    addHippedRoof(18.8, 10.4, 3.5, -3.8, 13.75, centerBlockZ, roofMat);
+    addTimberPattern(-3.8, 10.7, frontZ(centerBlockZ, 8.8), 13.2, 4.8);
+    addTrimBox(17.2, 0.24, 0.3, -3.8, 7.2, frontZ(centerBlockZ, 8.8) + 0.02, timberLightMat);
 
-    addWin(2.5, 6, 11, 6, 5.05);
-    addWin(2.5, 6, 15, 6, 5.05);
-    addWin(2.5, 6, 19, 6, 5.05);
+    // Right gable and short wing leading into the tower.
+    addBody(13.4, 8.6, 6.8, 17.4, 4.3, rightGableZ);
+    addGableRoof(15.2, 8.4, 3.8, 17.4, 8.85, rightGableZ, roofMat);
+    addTimberPattern(17.4, 7.25, frontZ(rightGableZ, 6.8), 11.2, 4.7);
+    addBody(9.8, 6.2, 5.8, 25.8, 3.1, -176.8);
+    addGableRoof(11.2, 7.4, 2.8, 25.8, 6.35, -176.8, roofMat);
 
-    // 5. THE TOWER
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(10, 45, 10), wallMat);
-    tower.position.set(28, 22.5, 2);
-    tower.castShadow = true;
-    group.add(tower);
+    // Small entrance porch centered on the road axis.
+    addBody(7.2, 5.4, 5.1, -2.2, 2.7, porchZ);
+    addGableRoof(8.5, 6.2, 2.4, -2.2, 5.58, porchZ, towerRoofMat);
+    addPlane(2.7, 3.05, -2.2, 1.85, frontZ(porchZ, 5.1), doorMat, 0, 4);
+    addPlane(3.3, 0.24, -2.2, 3.55, frontZ(porchZ, 5.1) + 0.04, timberMat, 0, 5);
 
-    // Tower framing
-    addTimber(10, 0.6, 28, 45, 7.05);
-    addTimber(10, 0.6, 28, 38, 7.05);
-    addTimber(10, 0.6, 28, 30, 7.05);
-    addTimber(10, 0.6, 28, 22, 7.05);
-    addTimber(0.6, 23, 23.3, 33.5, 7.05);
-    addTimber(0.6, 23, 32.7, 33.5, 7.05);
-    addTimber(0.6, 23, 28, 33.5, 7.05);
-    addTimber(0.6, 10, 25.5, 41.5, 7.05, 0.8); // X left
-    addTimber(0.6, 10, 30.5, 41.5, 7.05, -0.8); // X right
-
-    addWin(3, 6, 28, 34, 7.05);
-    addWin(3, 6, 28, 26, 7.05);
-
-    const clock = new THREE.Mesh(new THREE.CircleGeometry(2, 16), wallMat);
-    clock.position.set(28, 42, 7.1);
-    group.add(clock);
-    const clockDot = new THREE.Mesh(new THREE.CircleGeometry(0.5, 8), new THREE.MeshBasicMaterial({color: 0x000000}));
-    clockDot.position.set(28, 42, 7.2);
-    group.add(clockDot);
-
-    // Tower Roof (Flared)
-    const tRoofBase = new THREE.Mesh(new THREE.ConeGeometry(9, 4, 4), roofMat);
-    tRoofBase.rotation.y = Math.PI / 4;
-    tRoofBase.position.set(28, 47, 2);
-    group.add(tRoofBase);
-    
-    const tRoofSpire = new THREE.Mesh(new THREE.ConeGeometry(6, 14, 4), roofMat);
-    tRoofSpire.rotation.y = Math.PI / 4;
-    tRoofSpire.position.set(28, 54, 2);
-    group.add(tRoofSpire);
-
-    // Foundation
-    const baseLine = new THREE.Mesh(new THREE.BoxGeometry(68, 1.5, 12), baseMat);
-    baseLine.position.set(-2, 0.75, 0);
-    group.add(baseLine);
-
-    // Background wings
-    const backLeft = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 30), wallMat);
-    backLeft.position.set(-30, 6, -20);
-    group.add(backLeft);
-    const backRight = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 30), wallMat);
-    backRight.position.set(20, 6, -20);
-    group.add(backRight);
-
-    for(let i=0; i<3; i++) {
-        const t = createLowPolyTree();
-        t.position.set(-10 + i*8, 0, -10);
-        group.add(t);
+    const frontWindows = [
+        [-32.2, 3.7, frontWingZ, 6.4], [-22.4, 3.7, frontWingZ, 6.4],
+        [-15.2, 3.65, frontWingZ, 6.4], [-10.8, 3.65, frontWingZ, 6.4],
+        [4.0, 3.65, frontWingZ, 6.4], [8.4, 3.65, frontWingZ, 6.4],
+        [14.2, 3.7, frontWingZ, 6.4], [20.6, 3.65, frontWingZ, 6.4], [25.4, 3.45, -176.8, 5.8],
+        [-27.2, 4.35, leftGableZ, 7.0], [-30.0, 7.05, leftGableZ, 7.0], [-24.4, 7.05, leftGableZ, 7.0],
+        [-7.5, 5.1, centerBlockZ, 8.8], [-3.8, 5.1, centerBlockZ, 8.8], [-0.1, 5.1, centerBlockZ, 8.8],
+        [-7.5, 9.0, centerBlockZ, 8.8], [-3.8, 9.0, centerBlockZ, 8.8], [-0.1, 9.0, centerBlockZ, 8.8],
+        [17.4, 4.2, rightGableZ, 6.8], [14.8, 7.05, rightGableZ, 6.8], [20.0, 7.05, rightGableZ, 6.8],
+    ];
+    for (const [x, y, z, depth] of frontWindows) {
+        addWindow(x, y, frontZ(z, depth), 1.18, y > 6.4 ? 1.72 : 1.95);
     }
 
-    const endGrassMat = new THREE.MeshStandardMaterial({ color: 0x3a732a, roughness: 1.0, flatShading: true });
-    const endGrass = new THREE.Mesh(new THREE.PlaneGeometry(80, 25), endGrassMat);
-    endGrass.rotation.x = -Math.PI / 2;
-    endGrass.position.set(-2, 0.05, 14);
-    group.add(endGrass);
+    // Right tower with open-looking upper section and dark timber ribs.
+    addBody(6.0, 24.0, 5.8, 32.2, 12.0, towerZ);
+    addBody(7.2, 5.0, 6.8, 32.2, 26.4, towerZ + 0.15);
+    addHippedRoof(8.6, 8.2, 2.4, 32.2, 29.2, towerZ + 0.15, towerRoofMat);
 
-    group.scale.set(1.4, 1.4, 1.4);
-    group.position.set(0, 0, -120);
+    const towerFront = frontZ(towerZ, 5.8);
+    for (const x of [29.55, 34.85]) addPlane(0.23, 23.8, x, 13.4, towerFront, timberMat, 0, 5);
+    for (const y of [6.8, 12.6, 18.4, 24.1]) addPlane(5.2, 0.22, 32.2, y, towerFront + 0.01, timberMat, 0, 5);
+    addPlane(0.2, 7.2, 30.9, 22.0, towerFront + 0.03, timberMat, -0.32, 6);
+    addPlane(0.2, 7.2, 33.5, 22.0, towerFront + 0.03, timberMat, 0.32, 6);
+    addWindow(32.2, 8.8, towerFront + 0.05, 1.05, 1.7);
+    addWindow(32.2, 15.0, towerFront + 0.05, 1.05, 1.9);
 
+    const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.02, 24), clockMat);
+    clockFace.position.set(32.2, 21.6, towerFront + 0.13);
+    clockFace.renderOrder = 6;
+    group.add(clockFace);
+    addPlane(0.07, 0.78, 32.2, 21.75, towerFront + 0.17, timberMat, 0.05, 7);
+    addPlane(0.07, 0.64, 32.45, 21.6, towerFront + 0.18, timberMat, Math.PI / 2.5, 7);
+
+    const spireBase = new THREE.Mesh(new THREE.ConeGeometry(7.1, 3.2, 4), towerRoofMat);
+    spireBase.rotation.y = Math.PI / 4;
+    spireBase.position.set(32.2, 31.3, towerZ + 0.15);
+    spireBase.castShadow = true;
+    group.add(spireBase);
+
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(4.2, 8.6, 4), towerRoofMat);
+    spire.rotation.y = Math.PI / 4;
+    spire.position.set(32.2, 36.75, towerZ + 0.15);
+    spire.castShadow = true;
+    group.add(spire);
+
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 4.0, 8), timberMat);
+    antenna.position.set(32.2, 42.9, towerZ + 0.15);
+    group.add(antenna);
+
+    group.position.z = 28;
     return group;
 }
 
 function addSceneryCluster(z) {
     const group = new THREE.Group();
-    const hillMat = new THREE.MeshStandardMaterial({ color: 0x5a9a40, roughness: 1.0, flatShading: true });
 
     for (const side of [-1, 1]) {
-        // Low-poly grassy hills
-        const hillGeo = new THREE.IcosahedronGeometry(28 + Math.random() * 8, 1);
-        const hill = new THREE.Mesh(hillGeo, hillMat);
-        hill.position.set(side * (32 + Math.random() * 4), -10, (Math.random() - 0.5) * 10);
-        hill.scale.set(1, 0.4, 1.4);
-        hill.receiveShadow = true;
-        group.add(hill);
-
-        const bigHillGeo = new THREE.IcosahedronGeometry(45, 1);
-        const bigHill = new THREE.Mesh(bigHillGeo, hillMat);
-        bigHill.position.set(side * (52 + Math.random() * 8), -15, (Math.random() - 0.5) * 15);
-        bigHill.scale.set(1, 0.5, 1.5);
-        bigHill.receiveShadow = true;
-        group.add(bigHill);
-
-        for (let i = 0; i < 3; i++) {
-            if (Math.random() > 0.2) {
-                const tree = createLowPolyTree();
-                tree.position.set(side * (14 + Math.random() * 20), 0, (Math.random() - 0.5) * 15);
-                group.add(tree);
-            }
+        const treeCount = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < treeCount; i++) {
+            const tree = createLowPolyTree();
+            tree.position.set(
+                side * (21 + Math.random() * 17),
+                0,
+                -18 + Math.random() * 16
+            );
+            tree.scale.multiplyScalar(0.74 + Math.random() * 0.34);
+            registerGroundSpawn(tree);
+            group.add(tree);
         }
-        
-        if (Math.random() > 0.5) {
-            const cloud = createLowPolyCloud();
-            cloud.position.set(side * (10 + Math.random() * 40), 20 + Math.random() * 15, (Math.random() - 0.5) * 20);
-            group.add(cloud);
+
+        if (Math.random() > 0.2) {
+            const bush = createBush();
+            bush.position.set(side * (18 + Math.random() * 16), 0, -18 + Math.random() * 16);
+            bush.scale.multiplyScalar(0.9 + Math.random() * 0.4);
+            registerGroundSpawn(bush);
+            group.add(bush);
+        }
+
+        if (Math.random() > 0.48) {
+            const rock = createRock();
+            rock.position.set(side * (18 + Math.random() * 14), 0, -18 + Math.random() * 16);
+            rock.scale.multiplyScalar(0.8 + Math.random() * 0.35);
+            registerGroundSpawn(rock);
+            group.add(rock);
         }
     }
 
     group.position.z = z;
     world.add(group);
     scenery.push(group);
+}
+
+function addCloudCluster(z, index = 0) {
+    const group = new THREE.Group();
+    const cloudSlots = [-48, -34, -20, -7, 9, 21, 48];
+    const cloudCount = index % 3 === 0 ? 2 : 1;
+    for (let i = 0; i < cloudCount; i++) {
+        const cloud = createLowPolyCloud();
+        const slot = cloudSlots[(index + i * 3) % cloudSlots.length];
+        cloud.position.set(
+            slot + (Math.random() - 0.5) * 5,
+            17.8 + Math.random() * 4.2 + i * 1.4,
+            (Math.random() - 0.5) * 8
+        );
+        cloud.scale.multiplyScalar(0.48 + Math.random() * 0.22);
+        group.add(cloud);
+    }
+    group.position.z = z;
+    world.add(group);
+    cloudScenery.push(group);
 }
 function createCampusBuilding(floors = 2) {
     const group = new THREE.Group();
@@ -1588,6 +1860,37 @@ function createFallbackPreview() {
     return group;
 }
 
+function centerObjectOnParentGround(object, parent) {
+    if (!object || !parent) return;
+    object.updateMatrixWorld(true);
+    parent.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(object);
+    const center = new THREE.Vector3();
+    const parentPosition = new THREE.Vector3();
+    box.getCenter(center);
+    parent.getWorldPosition(parentPosition);
+    object.position.x -= center.x - parentPosition.x;
+    object.position.y -= box.min.y - parentPosition.y;
+    object.position.z -= center.z - parentPosition.z;
+}
+
+function normalizePreviewObject(object, parent) {
+    if (!object || !parent) return;
+    object.position.set(0, 0, 0);
+    object.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(object);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const scaleCandidates = [];
+    if (size.x > 0) scaleCandidates.push(1.9 / size.x);
+    if (size.y > 0) scaleCandidates.push(3.18 / size.y);
+    if (size.z > 0) scaleCandidates.push(1.85 / size.z);
+    const scale = scaleCandidates.length ? Math.min(...scaleCandidates, 1.08) : 1;
+    object.scale.multiplyScalar(scale);
+    centerObjectOnParentGround(object, parent);
+}
+
 function createSelectorStage() {
     const stage = new THREE.Group();
     stage.name = 'selector-stage';
@@ -1598,17 +1901,44 @@ function createSelectorStage() {
     stageLight.position.set(0, 4.4, 5.1);
     stage.add(stageLight);
 
+    const platform = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.9, 2.05, 0.28, 56),
+        new THREE.MeshStandardMaterial({ color: 0xf3e5cf, roughness: 0.82, metalness: 0.02 })
+    );
+    platform.position.set(0, 0.14, 2.15);
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    stage.add(platform);
+
+    const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(1.93, 0.075, 12, 60),
+        new THREE.MeshStandardMaterial({
+            color: 0x26313a,
+            emissive: 0x111820,
+            emissiveIntensity: 0.04,
+            roughness: 0.46,
+        })
+    );
+    rim.rotation.x = Math.PI / 2;
+    rim.position.set(0, 0.31, 2.15);
+    stage.add(rim);
+    accentMeshes.push(rim);
+
+    const mark = new THREE.Mesh(
+        new THREE.CircleGeometry(0.52, 32),
+        new THREE.MeshStandardMaterial({ color: 0xe7d5bd, roughness: 0.72 })
+    );
+    mark.rotation.x = -Math.PI / 2;
+    mark.position.set(0, 0.325, 2.15);
+    stage.add(mark);
+
     const previewGroup = new THREE.Group();
-    previewGroup.position.set(0, 0.02, 2.15); // Stand on ground directly
+    previewGroup.position.set(0, 0.32, 2.15);
     stage.add(previewGroup);
-    
-    // Provide stub objects for platform and rim to prevent null errors in colors
-    const dummyMat = { color: { setHex: () => {} } };
-    const dummyMesh = { material: dummyMat };
-    
-    stage.userData.preview = { 
-        group: previewGroup, root: null, mixer: null, asset: null, 
-        platform: dummyMesh, rim: dummyMesh, accentMeshes 
+
+    stage.userData.preview = {
+        group: previewGroup, root: null, mixer: null, asset: null,
+        platform, rim, accentMeshes
     };
 
     scene.add(stage);
@@ -1624,19 +1954,24 @@ async function setPreviewCharacter() {
     if (token !== previewLoadToken) return;
     if (!asset || preview.asset === asset) {
         if (preview.root) applyCustomizationToRoot(preview.root);
+        updateCustomizeAvailability(preview.root);
         return;
     }
     if (preview.root) preview.group.remove(preview.root);
     preview.mixer = null;
     const root = clonePlayerModel(asset) || createFallbackPreview();
     root.rotation.y += Math.PI;
-    root.scale.multiplyScalar(0.92);
     preview.group.add(root);
     preview.root = root;
     preview.asset = asset;
     preview.mixer = new THREE.AnimationMixer(root);
     const idle = asset.animations?.find(clip => clip.name === 'Idle') || asset.animations?.[0];
-    if (idle) preview.mixer.clipAction(idle).play();
+    if (idle) {
+        preview.mixer.clipAction(idle).play();
+        preview.mixer.setTime(0.1);
+    }
+    normalizePreviewObject(root, preview.group);
+    updateCustomizeAvailability(root);
 }
 
 async function activatePlayerCharacter() {
@@ -1663,15 +1998,52 @@ function isSecondaryGender(file) {
     return Boolean(GENDER_PAIRS[file]) && file.endsWith('_Female.gltf');
 }
 
+function isFemaleCharacter(file) {
+    return file.endsWith('_Female.gltf') || [
+        'Witch.gltf',
+        'Chef_Female.gltf',
+        'Cowboy_Female.gltf',
+        'Pirate_Female.gltf',
+        'Ninja_Sand_Female.gltf',
+        'Knight_Golden_Female.gltf',
+    ].includes(file);
+}
+
+function getPrimaryCharacterFile(file) {
+    const pairFile = GENDER_PAIRS[file];
+    return pairFile && isFemaleCharacter(file) ? pairFile : file;
+}
+
+function findCharacterIndexByFile(file) {
+    return PRESETS.character.findIndex(character => character.file === file);
+}
+
+function findGenderVariantIndex(primaryFile, wantsFemale) {
+    if (!wantsFemale) return findCharacterIndexByFile(primaryFile);
+    const pairFile = GENDER_PAIRS[primaryFile];
+    if (pairFile && isFemaleCharacter(pairFile)) {
+        const pairIndex = findCharacterIndexByFile(pairFile);
+        if (pairIndex >= 0) return pairIndex;
+    }
+    return findCharacterIndexByFile(primaryFile);
+}
+
 function updateGenderButton() {
     const character = getCurrentCharacter();
     const pair = GENDER_PAIRS[character.file];
     if (!pair) {
-        customizeGender.hidden = true;
+        customizeGenderRow.hidden = true;
         return;
     }
-    customizeGender.hidden = false;
-    customizeGender.textContent = character.file.endsWith('_Female.gltf') ? 'Sexo: Feminino' : 'Sexo: Masculino';
+    customizeGenderRow.hidden = false;
+    customizeGenderName.textContent = isFemaleCharacter(character.file) ? 'Feminino' : 'Masculino';
+}
+
+function updateCustomizeAvailability(root) {
+    for (const [region, row] of Object.entries(customizeRows)) {
+        if (!row) continue;
+        row.hidden = Boolean(root) && countMatchingMats(root, MATERIAL_TARGETS[region]) === 0;
+    }
 }
 
 function updateCharacterSelection({ syncPlayer = true } = {}) {
@@ -1684,7 +2056,7 @@ function updateCharacterSelection({ syncPlayer = true } = {}) {
     customizeShirtName.textContent = PRESETS.shirt[customIndex.shirt].label;
     customizePantsName.textContent = PRESETS.pants[customIndex.pants].label;
     updateGenderButton();
-    selectorStage.userData.preview?.accentMeshes?.forEach(mesh => mesh.material?.color?.setHex(getCurrentAccentColor()));
+    updateCustomizeAvailability(selectorStage.userData.preview?.root);
     setPreviewCharacter();
     if (player.root) applyCustomizationToRoot(player.root);
     if (syncPlayer) activatePlayerCharacter();
@@ -1692,15 +2064,29 @@ function updateCharacterSelection({ syncPlayer = true } = {}) {
 }
 
 function cycleCustomize(region, dir) {
+    if (region === 'gender') {
+        const pairFile = GENDER_PAIRS[getCurrentCharacter().file];
+        if (!pairFile) return;
+        const idx = PRESETS.character.findIndex(character => character.file === pairFile);
+        if (idx >= 0) {
+            customIndex.character = idx;
+            updateCharacterSelection();
+        }
+        return;
+    }
     const arr = PRESETS[region];
     if (!arr) return;
     if (region === 'character') {
-        let next = normalizeIndex(customIndex.character + dir, arr.length);
+        const currentFile = getCurrentCharacter().file;
+        const wantsFemale = isFemaleCharacter(currentFile);
+        const primaryIndex = findCharacterIndexByFile(getPrimaryCharacterFile(currentFile));
+        let next = normalizeIndex((primaryIndex >= 0 ? primaryIndex : customIndex.character) + dir, arr.length);
         let guard = arr.length;
         while (isSecondaryGender(arr[next].file) && guard-- > 0) {
             next = normalizeIndex(next + dir, arr.length);
         }
-        customIndex.character = next;
+        customIndex.character = findGenderVariantIndex(arr[next].file, wantsFemale);
+        if (customIndex.character < 0) customIndex.character = next;
     } else {
         customIndex[region] = normalizeIndex(customIndex[region] + dir, arr.length);
     }
@@ -1711,75 +2097,95 @@ function updateSelectorStage(delta, t) {
     const visible = state === 'customize' || state === 'menu';
     selectorStage.visible = visible;
     if (!visible) return;
-    const targetStageX = state === 'menu' ? 3.05 : 0;
+    const targetStageX = 0;
     selectorStage.position.x += (targetStageX - selectorStage.position.x) * (1 - Math.exp(-8 * delta));
     const preview = selectorStage.userData.preview;
-    if (state === 'customize') preview?.mixer?.update(delta);
     if (preview?.group) {
-        const targetRotation = 0; // Stop rotation, look directly forward at camera
-        const targetY = 0.02; // Stop bobbing, rest flat on the ground
+        const targetRotation = 0;
+        const targetY = 0.32;
         preview.group.rotation.y += (targetRotation - preview.group.rotation.y) * (1 - Math.exp(-10 * delta));
         preview.group.position.y += (targetY - preview.group.position.y) * (1 - Math.exp(-10 * delta));
     }
 }
 
-function playPlayerAction(name) {
+function playPlayerAction(name, { fallback = 'Run', fade = 0.12 } = {}) {
     if (!player.usesModel) return;
-    const action = player.actions[name] || player.actions.Run || player.actions.Idle;
+    const action = player.actions[name] || player.actions[fallback] || player.actions.Idle;
     if (!action || player.currentAction === action) return;
     action.reset();
     action.enabled = true;
-    action.fadeIn(0.12);
+    const oneShot = action === player.actions.Roll || action === player.actions.Death || action === player.actions.Defeat;
+    action.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
+    action.clampWhenFinished = oneShot;
+    action.fadeIn(fade);
     action.play();
-    if (player.currentAction) player.currentAction.fadeOut(0.12);
+    if (player.currentAction) player.currentAction.fadeOut(fade);
     player.currentAction = action;
+    return action;
+}
+
+function createCoinObject({ bitcoin = false } = {}) {
+    const group = new THREE.Group();
+    const faceMap = makeCoinFaceTexture(
+        bitcoin ? 'BTC' : 'IF',
+        bitcoin ? '#f7931a' : '#ffd84a',
+        bitcoin ? '#fff9dd' : '#1f8a45'
+    );
+    const edgeMat = new THREE.MeshStandardMaterial({
+        color: bitcoin ? 0xc8750d : 0xd39a22,
+        roughness: 0.38,
+        metalness: 0.18,
+    });
+    const faceMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: faceMap,
+        roughness: 0.28,
+        metalness: 0.12,
+    });
+    const coin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.64, 0.64, 0.16, 48, 1, false),
+        [edgeMat, faceMat, faceMat.clone()]
+    );
+    coin.rotation.x = Math.PI / 2;
+    coin.castShadow = true;
+    coin.receiveShadow = true;
+    group.add(coin);
+
+    const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.66, 0.045, 10, 48),
+        new THREE.MeshStandardMaterial({
+            color: bitcoin ? 0xffb24a : 0xffe08a,
+            emissive: bitcoin ? 0xf7931a : 0xffc94a,
+            emissiveIntensity: bitcoin ? 0.14 : 0.08,
+            roughness: 0.3,
+            metalness: 0.1,
+        })
+    );
+    rim.position.z = 0.09;
+    group.add(rim);
+
+    return group;
 }
 
 function createCollectible(topic, lane, z) {
     const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({
-        color: topic.color,
-        emissive: topic.color,
-        emissiveIntensity: 0.36,
-        roughness: 0.22,
-        metalness: 0.08,
-    });
-    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.64, 1), mat);
-    gem.castShadow = true;
-    group.add(gem);
+    const coin = createCoinObject();
+    group.add(coin);
 
     const ring = new THREE.Mesh(
         new THREE.TorusGeometry(0.86, 0.045, 8, 34),
-        new THREE.MeshBasicMaterial({ color: topic.color, transparent: true, opacity: 0.74 })
+        new THREE.MeshBasicMaterial({ color: 0xffee8a, transparent: true, opacity: 0.62 })
     );
     ring.rotation.x = Math.PI / 2;
+    ring.position.y = -0.02;
     group.add(ring);
 
     const beam = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.46, 0.68, 2.8, 24, 1, true),
-        new THREE.MeshBasicMaterial({ color: topic.color, transparent: true, opacity: 0.16, depthWrite: false })
+        new THREE.CylinderGeometry(0.38, 0.54, 2.0, 24, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffdf63, transparent: true, opacity: 0.1, depthWrite: false })
     );
-    beam.position.y = 0.22;
+    beam.position.y = 0.02;
     group.add(beam);
-
-    const label = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.05, 1.05),
-        new THREE.MeshBasicMaterial({
-            map: makeLabelTexture(topic.tag, '#' + topic.color.toString(16).padStart(6, '0')),
-            transparent: true,
-        })
-    );
-    label.position.y = 1.15;
-    label.rotation.x = -0.22;
-    group.add(label);
-
-    const collectSign = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.2, 0.48),
-        new THREE.MeshBasicMaterial({ map: makeLabelTexture('PEGUE', '#20c997'), transparent: true })
-    );
-    collectSign.position.y = -0.42;
-    collectSign.rotation.x = -0.28;
-    group.add(collectSign);
 
     group.position.set(LANES[lane], 1.1, z);
     world.add(group);
@@ -1788,29 +2194,23 @@ function createCollectible(topic, lane, z) {
 
 function createPowerUp(lane, z) {
     const group = new THREE.Group();
-    const shieldMat = new THREE.MeshStandardMaterial({
-        color: 0x20c997,
-        emissive: 0x20c997,
-        emissiveIntensity: 0.24,
-        roughness: 0.26,
-    });
-    const shieldMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.78, 1), shieldMat);
-    shieldMesh.castShadow = true;
-    group.add(shieldMesh);
+    const bitcoin = createCoinObject({ bitcoin: true });
+    bitcoin.scale.setScalar(1.12);
+    group.add(bitcoin);
 
     const halo = new THREE.Mesh(
         new THREE.TorusGeometry(1.05, 0.055, 8, 36),
-        new THREE.MeshBasicMaterial({ color: 0x20c997, transparent: true, opacity: 0.76 })
+        new THREE.MeshBasicMaterial({ color: 0x2b9cff, transparent: true, opacity: 0.78 })
     );
     halo.rotation.x = Math.PI / 2;
     group.add(halo);
 
-    const label = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.1, 1.1),
-        new THREE.MeshBasicMaterial({ map: makeLabelTexture('POWER', '#20c997'), transparent: true })
+    const aura = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.76, 2.3, 28, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xf7931a, transparent: true, opacity: 0.14, depthWrite: false })
     );
-    label.position.y = 1.22;
-    group.add(label);
+    aura.position.y = 0.04;
+    group.add(aura);
 
     group.position.set(LANES[lane], 1.1, z);
     world.add(group);
@@ -1974,7 +2374,7 @@ function spawnCollectibles() {
     if (Math.random() > 0.72) createPowerUp((lane + 1 + Math.floor(Math.random() * 2)) % 3, z - 10);
 }
 
-function resetGame() {
+function clearRunObjects() {
     for (const obj of liveObjects.splice(0)) {
         obj.group.removeFromParent();
     }
@@ -1984,6 +2384,83 @@ function resetGame() {
     for (const popup of comboPopups.splice(0)) {
         popup.removeFromParent();
     }
+}
+
+function finishGroundSpawn(group) {
+    for (const child of group.children) {
+        const baseScale = child.userData.baseScale;
+        if (!baseScale) continue;
+        child.userData.growProgress = 1;
+        child.scale.copy(baseScale);
+        child.position.y = child.userData.baseY;
+    }
+}
+
+function resetVisualWorldLoops() {
+    roadSegments.forEach((segment, index) => {
+        segment.position.z = -index * 34;
+    });
+    scenery.forEach((group, index) => {
+        group.position.z = SCENERY_START_Z - index * SCENERY_SPACING;
+        finishGroundSpawn(group);
+    });
+    cloudScenery.forEach((group, index) => {
+        group.position.z = CLOUD_START_Z + index * CLOUD_SPACING;
+    });
+}
+
+function resetPlayerRootTransform() {
+    if (!player.root) return;
+    const basePosition = player.root.userData.basePosition;
+    const baseRotation = player.root.userData.baseRotation;
+    if (basePosition) player.root.position.copy(basePosition);
+    if (baseRotation) {
+        player.root.rotation.copy(baseRotation);
+    } else {
+        player.root.rotation.set(0, Math.PI, 0);
+    }
+}
+
+function keepPlayerRootAboveGround() {
+    if (!player.root) return;
+    player.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(player.root);
+    const groundY = player.group.position.y;
+    if (box.min.y < groundY) {
+        player.root.position.y += groundY - box.min.y;
+    }
+}
+
+function updatePlayerRollPose(progress) {
+    if (!player.root) return;
+    const basePosition = player.root.userData.basePosition;
+    const baseRotation = player.root.userData.baseRotation;
+    if (basePosition) player.root.position.copy(basePosition);
+    if (baseRotation) player.root.rotation.copy(baseRotation);
+
+    const clamped = THREE.MathUtils.clamp(progress, 0, 1);
+    const eased = clamped * clamped * (3 - 2 * clamped);
+    const dive = Math.sin(clamped * Math.PI);
+    const tuck = Math.sin(Math.min(1, clamped * 1.32) * Math.PI);
+    const rebound = Math.sin(Math.max(0, clamped - 0.58) / 0.42 * Math.PI);
+
+    player.root.rotation.x += -eased * Math.PI * 2 - dive * 0.18;
+    player.root.rotation.z += Math.sin(clamped * Math.PI * 2) * 0.08;
+    player.root.position.z += -dive * 0.62 + rebound * 0.16;
+    player.root.position.y += -tuck * 0.42 + rebound * 0.2;
+    keepPlayerRootAboveGround();
+}
+
+function setScoreFormSaved(saved) {
+    scoreForm.dataset.saved = saved ? 'true' : 'false';
+    scoreFormLabel.textContent = saved ? 'Ranking salvo com sucesso' : 'Nome para o ranking';
+    playerNameInput.disabled = saved;
+    scoreFormSubmit.disabled = saved;
+}
+
+function resetGame() {
+    clearRunObjects();
+    resetVisualWorldLoops();
     score = 0;
     distance = 0;
     runTime = 0;
@@ -1996,6 +2473,8 @@ function resetGame() {
     combo = 0;
     comboTimer = 0;
     savedCurrentScore = false;
+    currentRunRank = null;
+    setScoreFormSaved(false);
     rankingRefreshTimer = 0;
     startCameraIntro = 0;
     laneIndex = 1;
@@ -2003,11 +2482,15 @@ function resetGame() {
     playerVelocityY = 0;
     isSliding = false;
     isFastDropping = false;
+    pendingGroundRoll = false;
     slideTimer = 0;
+    slideElapsed = 0;
+    slideVisualDuration = GAMEPLAY.slideDuration;
     topicCounts = Object.fromEntries(COURSE_TOPICS.map(topic => [topic.tag, 0]));
     player.group.position.set(0, 0, 5.2);
     player.group.rotation.set(0, 0, 0);
     player.group.scale.set(1, 1, 1);
+    resetPlayerRootTransform();
     player.group.visible = true;
     selectorStage.visible = false;
     player.shadow.visible = true;
@@ -2017,12 +2500,15 @@ function resetGame() {
 }
 
 function startGame() {
+    rankingEditorEnabled = false;
+    activeKeys.clear();
     resetGame();
     state = 'running';
     startCameraIntro = START_CAMERA_INTRO_DURATION;
     playPlayerAction('Run');
     customizePanel.hidden = true;
     pausePanel.hidden = true;
+    newRunConfirm.hidden = true;
     startScreen.hidden = true;
     startScreen.classList.remove('screen-open');
     gameOverScreen.hidden = true;
@@ -2030,15 +2516,37 @@ function startGame() {
     renderRanking();
 }
 
+function requestRetry() {
+    if (state !== 'gameover') {
+        startGame();
+        return;
+    }
+    newRunConfirm.hidden = false;
+}
+
 function endGame() {
     state = 'gameover';
+    isSliding = false;
+    isFastDropping = false;
+    pendingGroundRoll = false;
+    slideTimer = 0;
+    slideElapsed = 0;
+    playerVelocityY = 0;
+    player.group.rotation.z = 0;
+    player.group.scale.set(1, 1, 1);
+    resetPlayerRootTransform();
+    if (player.usesModel) {
+        playPlayerAction('Death', { fallback: 'Defeat', fade: 0.08 });
+    }
     finalScore.textContent = String(Math.floor(score));
-    finalTime.textContent = Math.floor(runTime) + 's';
+    finalTime.textContent = formatRankingTime(runTime);
     resultTitle.textContent = score > bestScore ? 'Novo recorde!' : 'Boa gameplay!';
+    currentRunRank = getPotentialRankingPosition(Math.floor(score), Math.floor(runTime));
+    scoreForm.hidden = currentRunRank === null;
     gameOverScreen.hidden = false;
     updatePauseUi();
     renderRanking();
-    setTimeout(() => playerNameInput.focus(), 80);
+    if (currentRunRank !== null) setTimeout(() => playerNameInput.focus(), 80);
 }
 
 function addScore(points) {
@@ -2098,7 +2606,7 @@ function showComboPopup(text, color = '#ffc94a') {
 }
 
 function getPlayerHitbox() {
-    const airborneSlide = isSliding || isFastDropping;
+    const airborneSlide = slideTimer > 0 || isFastDropping;
     const halfX = GAMEPLAY.playerHalfX;
     const halfY = airborneSlide ? GAMEPLAY.slideHalfY : GAMEPLAY.playerHalfY;
     const halfZ = airborneSlide ? GAMEPLAY.slideHalfZ : GAMEPLAY.playerHalfZ;
@@ -2111,6 +2619,20 @@ function getPlayerHitbox() {
         minZ: player.group.position.z - halfZ,
         maxZ: player.group.position.z + halfZ,
     };
+}
+
+function isPlayerGrounded() {
+    return player.group.position.y <= 0.05 && Math.abs(playerVelocityY) < 0.01;
+}
+
+function beginGroundRoll() {
+    pendingGroundRoll = false;
+    isFastDropping = false;
+    isSliding = true;
+    slideTimer = GAMEPLAY.slideDuration;
+    slideElapsed = 0;
+    slideVisualDuration = Math.max(slideTimer, 0.82);
+    playPlayerAction('Run', { fade: 0.05 });
 }
 
 function getObjectHitbox(obj) {
@@ -2135,6 +2657,11 @@ function intersectsBox(a, b, padding = 0) {
         a.minZ < b.maxZ - padding &&
         a.maxZ > b.minZ + padding
     );
+}
+
+function canObstacleHitPlayer(obj) {
+    const relativeZ = obj.group.position.z - player.group.position.z;
+    return relativeZ > -1.45 && relativeZ < 0.74;
 }
 
 function updateRunning(delta, t) {
@@ -2173,7 +2700,10 @@ function updateRunning(delta, t) {
     if (player.group.position.y <= 0) {
         player.group.position.y = 0;
         playerVelocityY = 0;
-        if (isFastDropping || wasAirborne) {
+        if (pendingGroundRoll) {
+            beginGroundRoll();
+            burstAt(player.group.position.x, 0.22, player.group.position.z - 0.25, getCurrentAccentColor());
+        } else if (isFastDropping || wasAirborne) {
             isFastDropping = false;
             slideTimer = Math.max(slideTimer, 0.18);
             if (wasAirborne) burstAt(player.group.position.x, 0.22, player.group.position.z - 0.25, getCurrentAccentColor());
@@ -2183,8 +2713,17 @@ function updateRunning(delta, t) {
     if (slideTimer > 0) {
         slideTimer -= delta;
         if (slideTimer <= 0) {
+            isFastDropping = false;
+            slideTimer = 0;
+        }
+    }
+    if (isSliding) {
+        slideElapsed = Math.min(slideVisualDuration, slideElapsed + delta);
+        if (slideElapsed >= slideVisualDuration) {
             isSliding = false;
             isFastDropping = false;
+            slideElapsed = 0;
+            resetPlayerRootTransform();
         }
     }
 
@@ -2193,10 +2732,19 @@ function updateRunning(delta, t) {
     player.group.rotation.z = (player.group.position.x - targetX) * -0.055;
 
     if (player.usesModel) {
-        if (isSliding) playPlayerAction('Roll');
-        else if (player.group.position.y > 0.08 || playerVelocityY > 0.1) playPlayerAction('Jump');
-        else playPlayerAction('Run');
-        player.root.rotation.x = isSliding ? -0.2 : THREE.MathUtils.lerp(player.root.rotation.x, 0, 1 - Math.exp(-8 * delta));
+        if (isSliding) {
+            playPlayerAction('Run', { fade: 0.05 });
+            const rollProgress = Math.min(1, slideElapsed / Math.max(0.001, slideVisualDuration));
+            updatePlayerRollPose(rollProgress);
+        } else if (player.group.position.y > 0.08 || playerVelocityY > 0.1) {
+            playPlayerAction('Jump');
+            player.root.rotation.x = THREE.MathUtils.lerp(player.root.rotation.x, 0, 1 - Math.exp(-8 * delta));
+            if (Math.abs(player.root.rotation.x) < 0.01) resetPlayerRootTransform();
+        } else {
+            playPlayerAction('Run');
+            player.root.rotation.x = THREE.MathUtils.lerp(player.root.rotation.x, 0, 1 - Math.exp(-8 * delta));
+            if (Math.abs(player.root.rotation.x) < 0.01) resetPlayerRootTransform();
+        }
     } else {
         player.limbs.armL.rotation.x = swing * 0.75;
         player.limbs.armR.rotation.x = -swing * 0.75;
@@ -2255,10 +2803,10 @@ function updateRunning(delta, t) {
             combo++;
             comboTimer = 2.1;
             addScore(220);
-            showComboPopup('DEBUG +2X', '#20c997');
+            showComboPopup('BITCOIN +2X', '#f7931a');
             showLearn({ tag: 'DBG', title: 'Debug', copy: 'Programar tambem e testar, corrigir e melhorar.' });
-            burstAt(obj.group.position.x, 1.4, obj.group.position.z, 0x20c997);
-        } else if (obj.type === 'obstacle' && intersectsBox(getPlayerHitbox(), getObjectHitbox(obj), GAMEPLAY.collisionPadding)) {
+            burstAt(obj.group.position.x, 1.4, obj.group.position.z, 0xf7931a);
+        } else if (obj.type === 'obstacle' && canObstacleHitPlayer(obj) && intersectsBox(getPlayerHitbox(), getObjectHitbox(obj), GAMEPLAY.collisionPadding)) {
             obj.hit = true;
             combo = 0;
             comboTimer = 0;
@@ -2271,6 +2819,7 @@ function updateRunning(delta, t) {
                 shake = 0.75;
                 burstAt(player.group.position.x, 1.2, player.group.position.z, 0xff4d4d);
                 endGame();
+                return;
             }
         }
 
@@ -2292,9 +2841,20 @@ function updateRunning(delta, t) {
 
 function updateScenery(delta, currentSpeed = speed) {
     for (const group of scenery) {
-        group.position.z += currentSpeed * delta;
-        if (group.position.z > 48) {
-            group.position.z -= 410;
+        group.position.z += currentSpeed * SCENERY_SPEED_FACTOR * delta;
+        if (group.position.z > SCENERY_RECYCLE_Z) {
+            group.position.z -= SCENERY_LOOP_LENGTH;
+            resetGroundSpawn(group);
+        }
+        updateGroundSpawn(group, delta);
+    }
+}
+
+function updateCloudScenery(delta, currentSpeed = speed) {
+    for (const group of cloudScenery) {
+        group.position.z += currentSpeed * CLOUD_SPEED_FACTOR * delta;
+        if (group.position.z > CLOUD_RECYCLE_Z) {
+            group.position.z -= CLOUD_LOOP_LENGTH;
         }
     }
 }
@@ -2348,24 +2908,22 @@ function animate() {
             segment.position.z += visualSpeed * delta;
             if (segment.position.z > 38) segment.position.z -= roadSegments.length * 34;
         }
-        segment.children.forEach(child => {
-            if (child.material?.map === mats.road.map) {
-                child.material.map.offset.y -= delta * visualSpeed * 0.018;
-            }
-        });
     }
 
     if (state === 'running') updateRunning(delta, t);
     if (state !== 'paused') {
         if (player.usesModel) player.mixer.update(delta);
         updateSelectorStage(delta, t);
-        if (state === 'running') updateScenery(delta, speed);
+        if (state === 'running') {
+            updateScenery(delta, speed);
+            updateCloudScenery(delta, speed);
+        }
         updateSparks(delta);
         updateComboPopups(delta);
     }
 
     const customizeFocus = new THREE.Vector3(0, 2.08, 2.15);
-    const menuFocus = new THREE.Vector3(0, 2.25, -16);
+    const menuFocus = new THREE.Vector3(0, 2.15, 2.15);
     let lookAt;
     let camTarget;
     if (state === 'customize') {
@@ -2373,7 +2931,7 @@ function animate() {
         camTarget = new THREE.Vector3(0, 4.35, 9.2);
     } else if (state === 'menu') {
         lookAt = menuFocus;
-        camTarget = new THREE.Vector3(0, 6.2, 17.2);
+        camTarget = new THREE.Vector3(0, 5.05, 11.4);
     } else {
         lookAt = new THREE.Vector3(player.group.position.x * 0.28, 2.2 + player.group.position.y * 0.2, -10 + startIntroEase * 6.5);
         camTarget = new THREE.Vector3(
@@ -2420,7 +2978,11 @@ function resumeGame() {
 }
 
 function showMenu() {
+    clearRunObjects();
+    resetVisualWorldLoops();
     state = 'menu';
+    activeKeys.clear();
+    newRunConfirm.hidden = true;
     player.group.visible = false;
     player.shadow.visible = false;
     selectorStage.visible = true;
@@ -2445,26 +3007,33 @@ function jump() {
         playerVelocityY = GAMEPLAY.jumpVelocity;
         isSliding = false;
         isFastDropping = false;
+        pendingGroundRoll = false;
         slideTimer = 0;
+        slideElapsed = 0;
+        resetPlayerRootTransform();
         playPlayerAction('Jump');
     }
 }
 
 function slide() {
     if (state !== 'running') return;
-    isSliding = true;
-    playPlayerAction('Roll');
-    if (player.group.position.y > 0.08) {
+    if (!isPlayerGrounded()) {
+        pendingGroundRoll = true;
+        isSliding = false;
+        slideElapsed = 0;
         isFastDropping = true;
         playerVelocityY = Math.min(playerVelocityY, -GAMEPLAY.fastDropVelocity);
         slideTimer = Math.max(slideTimer, GAMEPLAY.airborneSlideDuration);
+        resetPlayerRootTransform();
+        playPlayerAction('Jump', { fade: 0.05 });
     } else {
-        slideTimer = GAMEPLAY.slideDuration;
+        beginGroundRoll();
     }
 }
 
 function openCustomize() {
     state = 'customize';
+    newRunConfirm.hidden = true;
     startScreen.hidden = true;
     gameOverScreen.hidden = true;
     player.group.visible = false;
@@ -2479,6 +3048,7 @@ function openCustomize() {
 
 function closeCustomize() {
     state = 'menu';
+    newRunConfirm.hidden = true;
     customizePanel.hidden = true;
     selectorStage.visible = false;
     player.group.visible = false;
@@ -2494,6 +3064,13 @@ function closeCustomize() {
 window.addEventListener('keydown', event => {
     if (event.repeat) return;
     const key = event.key.toLowerCase();
+    activeKeys.add(key);
+    activeKeys.add(event.code.toLowerCase());
+    if (state === 'menu' && activeKeys.has('b') && activeKeys.has('m') && (activeKeys.has('9') || activeKeys.has('digit9') || activeKeys.has('numpad9'))) {
+        rankingEditorEnabled = !rankingEditorEnabled;
+        renderRanking();
+        return;
+    }
     if (state === 'customize' && (key === 'arrowleft' || key === 'a')) {
         cycleCustomize('character', -1);
         return;
@@ -2527,6 +3104,11 @@ window.addEventListener('keydown', event => {
     if (key === 'enter' && state === 'menu') startGame();
 });
 
+window.addEventListener('keyup', event => {
+    activeKeys.delete(event.key.toLowerCase());
+    activeKeys.delete(event.code.toLowerCase());
+});
+
 let touchStart = null;
 window.addEventListener('pointerdown', event => {
     touchStart = { x: event.clientX, y: event.clientY };
@@ -2557,7 +3139,7 @@ window.addEventListener('resize', () => {
 });
 
 btnStart.addEventListener('click', startGame);
-btnRetry.addEventListener('click', startGame);
+btnRetry.addEventListener('click', requestRetry);
 btnMenu.addEventListener('click', showMenu);
 btnPause.addEventListener('click', () => {
     if (state === 'paused') resumeGame();
@@ -2565,6 +3147,15 @@ btnPause.addEventListener('click', () => {
 });
 btnResume.addEventListener('click', resumeGame);
 btnPauseMenu.addEventListener('click', showMenu);
+btnConfirmRetry.addEventListener('click', startGame);
+btnCancelRetry.addEventListener('click', () => {
+    newRunConfirm.hidden = true;
+});
+rankingList.addEventListener('click', event => {
+    const button = event.target.closest('.ranking-delete');
+    if (!button) return;
+    deleteRankingEntry(Number(button.dataset.rankingIndex));
+});
 btnCustomize.addEventListener('click', openCustomize);
 customizeClose.addEventListener('click', closeCustomize);
 customizeDone.addEventListener('click', closeCustomize);
@@ -2572,15 +3163,6 @@ document.querySelectorAll('[data-custom-region]').forEach(button => {
     button.addEventListener('click', () => {
         cycleCustomize(button.dataset.customRegion, Number(button.dataset.dir));
     });
-});
-customizeGender.addEventListener('click', () => {
-    const pairFile = GENDER_PAIRS[getCurrentCharacter().file];
-    if (!pairFile) return;
-    const idx = PRESETS.character.findIndex(character => character.file === pairFile);
-    if (idx >= 0) {
-        customIndex.character = idx;
-        updateCharacterSelection();
-    }
 });
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -2596,16 +3178,16 @@ if (urlParams.has('customize')) {
 scoreForm.addEventListener('submit', async event => {
     event.preventDefault();
     if (savedCurrentScore) return;
+    if (currentRunRank === null) return;
     const name = playerNameInput.value.trim().toUpperCase() || 'ALUNO IF';
     savedCurrentScore = true;
     await saveScore({
         name,
         score: Math.floor(score),
         time: Math.floor(runTime),
-        area: rankingPanel.dataset.lastTopic || 'WEB',
-        date: new Date().toLocaleDateString('pt-BR'),
     });
     playerNameInput.value = '';
+    setScoreFormSaved(true);
     renderRanking();
 });
 
@@ -2619,6 +3201,29 @@ function compareRankingEntries(a, b) {
     return String(a.name).localeCompare(String(b.name));
 }
 
+function formatRankingTime(secondsValue) {
+    const totalSeconds = Math.max(0, Math.floor(Number(secondsValue) || 0));
+    if (totalSeconds < 60) return `${totalSeconds}seg`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${minutes}:${seconds} min`;
+}
+
+function getPotentialRankingPosition(scoreValue, timeValue) {
+    const candidate = {
+        name: 'VOCE',
+        score: Math.max(0, Math.floor(scoreValue)),
+        time: Math.max(0, Math.floor(timeValue)),
+        current: true,
+    };
+    const combined = [
+        ...rankingCache.map(entry => ({ ...entry, current: false })),
+        candidate,
+    ].sort(compareRankingEntries);
+    const index = combined.findIndex(entry => entry.current);
+    return index >= 0 && index < 10 ? index + 1 : null;
+}
+
 function normalizeRanking(input) {
     const list = Array.isArray(input) ? input : Array.isArray(input?.ranking) ? input.ranking : [];
     return list
@@ -2627,8 +3232,6 @@ function normalizeRanking(input) {
             name: String(entry.name || 'ALUNO IF').slice(0, 14).toUpperCase(),
             score: Math.max(0, Math.floor(Number(entry.score))),
             time: Math.max(0, Math.floor(Number(entry.time || 0))),
-            area: String(entry.area || 'WEB').slice(0, 8).toUpperCase(),
-            date: String(entry.date || new Date().toLocaleDateString('pt-BR')),
         }))
         .sort(compareRankingEntries)
         .slice(0, 10);
@@ -2662,11 +3265,7 @@ async function syncRankingFromJson() {
         const payload = await response.json();
         rankingUsesJson = true;
         const jsonRanking = normalizeRanking(payload);
-        if (jsonRanking.length || !rankingCache.length) {
-            setRanking(jsonRanking);
-        } else {
-            await persistRankingToJson();
-        }
+        setRanking(jsonRanking);
     } catch {
         rankingUsesJson = false;
     }
@@ -2690,11 +3289,20 @@ async function saveScore(entry) {
     await persistRankingToJson();
 }
 
+async function deleteRankingEntry(index) {
+    if (!rankingEditorEnabled || state !== 'menu') return;
+    if (index < 0 || index >= rankingCache.length) return;
+    setRanking(rankingCache.filter((_, itemIndex) => itemIndex !== index));
+    await persistRankingToJson();
+    renderRanking();
+}
+
 function renderRanking() {
     const ranking = getRanking();
     const liveMode = state === 'running' || state === 'paused';
     const limit = liveMode ? 5 : 10;
     rankingPanel.dataset.mode = liveMode ? 'live' : 'full';
+    rankingPanel.dataset.editor = rankingEditorEnabled && state === 'menu' ? 'true' : 'false';
     rankingLimit.textContent = liveMode ? 'Top 5' : 'Top 10';
 
     let displayRanking;
@@ -2703,7 +3311,6 @@ function renderRanking() {
             name: 'VOCE',
             score: Math.floor(score),
             time: Math.floor(runTime),
-            date: 'Corrida atual',
             current: true,
         };
         const combined = [...ranking.map(entry => ({ ...entry, current: false })), currentRun].sort(compareRankingEntries);
@@ -2717,16 +3324,11 @@ function renderRanking() {
             ];
         }
     } else {
-        displayRanking = ranking.slice(0, limit).map((entry, index) => ({ ...entry, rank: index + 1 }));
+        displayRanking = ranking.slice(0, limit).map((entry, index) => ({ ...entry, rank: index + 1, sourceIndex: index }));
     }
 
     rankingList.innerHTML = '';
-    if (!displayRanking.length) {
-        const empty = document.createElement('li');
-        empty.innerHTML = '<span class="rank-number">-</span><span>Ninguem<span class="meta">Jogue uma rodada para aparecer aqui</span></span><span class="score-time"><strong>0</strong><span class="time">0s</span></span>';
-        rankingList.appendChild(empty);
-        return;
-    }
+    if (!displayRanking.length) return;
     for (const entry of displayRanking) {
         const li = document.createElement('li');
         if (entry.current) li.classList.add('current-run');
@@ -2735,21 +3337,24 @@ function renderRanking() {
         rank.textContent = entry.rank;
         const name = document.createElement('span');
         name.append(document.createTextNode(entry.name));
-        const meta = document.createElement('span');
-        meta.className = 'meta';
-        meta.textContent = entry.date;
-        name.appendChild(meta);
         const scoreWrap = document.createElement('span');
         scoreWrap.className = 'score-time';
         const scoreEl = document.createElement('strong');
         scoreEl.textContent = entry.score;
         const timeEl = document.createElement('span');
         timeEl.className = 'time';
-        timeEl.textContent = `${entry.time}s`;
+        timeEl.textContent = formatRankingTime(entry.time);
         scoreWrap.append(scoreEl, timeEl);
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'ranking-delete';
+        deleteButton.type = 'button';
+        deleteButton.textContent = 'X';
+        deleteButton.dataset.rankingIndex = String(entry.sourceIndex ?? -1);
+        deleteButton.setAttribute('aria-label', `Excluir ${entry.name}`);
         li.appendChild(rank);
         li.appendChild(name);
         li.appendChild(scoreWrap);
+        li.appendChild(deleteButton);
         rankingList.appendChild(li);
     }
 }

@@ -69,9 +69,6 @@
             <div class="customize-card">
                 <span class="eyebrow">Preparar corredor</span>
                 <h2>Trocar Personagem</h2>
-                <p>Escolha a skin, genero e cores do personagem antes de entrar na pista.</p>
-
-                <button id="customize-gender" class="gender-toggle" type="button" hidden>Genero</button>
 
                 <div class="customize-row">
                     <button class="selector-btn" data-custom-region="character" data-dir="-1" type="button">&lt;</button>
@@ -82,16 +79,25 @@
                     <button class="selector-btn" data-custom-region="character" data-dir="1" type="button">&gt;</button>
                 </div>
 
-                <div class="customize-row">
+                <div id="customize-gender-row" class="customize-row" hidden>
+                    <button id="customize-gender" class="selector-btn" data-custom-region="gender" data-dir="-1" type="button">&lt;</button>
+                    <div>
+                        <span>Sexo</span>
+                        <strong id="customize-gender-name">Masculino</strong>
+                    </div>
+                    <button class="selector-btn" data-custom-region="gender" data-dir="1" type="button">&gt;</button>
+                </div>
+
+                <div id="customize-skin-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="skin" data-dir="-1" type="button">&lt;</button>
                     <div>
-                        <span>Pele</span>
+                        <span>Cor de Pele</span>
                         <strong id="customize-skin-name">Pele clara</strong>
                     </div>
                     <button class="selector-btn" data-custom-region="skin" data-dir="1" type="button">&gt;</button>
                 </div>
 
-                <div class="customize-row">
+                <div id="customize-hair-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="hair" data-dir="-1" type="button">&lt;</button>
                     <div>
                         <span>Cabelo</span>
@@ -100,7 +106,7 @@
                     <button class="selector-btn" data-custom-region="hair" data-dir="1" type="button">&gt;</button>
                 </div>
 
-                <div class="customize-row">
+                <div id="customize-shirt-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="shirt" data-dir="-1" type="button">&lt;</button>
                     <div>
                         <span>Roupa</span>
@@ -109,7 +115,7 @@
                     <button class="selector-btn" data-custom-region="shirt" data-dir="1" type="button">&gt;</button>
                 </div>
 
-                <div class="customize-row">
+                <div id="customize-pants-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="pants" data-dir="-1" type="button">&lt;</button>
                     <div>
                         <span>Calca</span>
@@ -145,7 +151,7 @@
                     </div>
                     <div>
                         <span>Tempo</span>
-                        <strong id="final-time">0s</strong>
+                        <strong id="final-time">0seg</strong>
                     </div>
                 </div>
 
@@ -160,6 +166,18 @@
                 <div class="end-actions">
                     <button id="btn-retry" class="ghost-btn" type="button">Jogar de Novo</button>
                     <button id="btn-menu" class="ghost-btn" type="button">Menu</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="new-run-confirm" class="confirm-panel" hidden>
+            <div class="confirm-card">
+                <span class="eyebrow">Nova partida</span>
+                <h2>Comecar de novo?</h2>
+                <p>A corrida atual sera encerrada e uma nova partida vai iniciar agora.</p>
+                <div class="confirm-actions">
+                    <button id="btn-confirm-retry" class="primary-btn" type="button">Iniciar Nova Partida</button>
+                    <button id="btn-cancel-retry" class="ghost-btn" type="button">Cancelar</button>
                 </div>
             </div>
         </section>
