@@ -58,6 +58,56 @@ button {
     display: block;
 }
 
+.ranking-editor-toggle {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 26;
+    width: 30px;
+    height: 30px;
+    display: none;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    opacity: 0.2;
+}
+
+.ranking-editor-toggle::before,
+.ranking-editor-toggle::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(16, 36, 58, 0.72);
+}
+
+.ranking-editor-toggle::before {
+    transform: rotate(45deg);
+}
+
+.ranking-editor-toggle::after {
+    transform: rotate(-45deg);
+}
+
+.ranking-editor-toggle[aria-pressed="true"] {
+    opacity: 0.34;
+}
+
+.ranking-editor-toggle[aria-pressed="true"]::before,
+.ranking-editor-toggle[aria-pressed="true"]::after {
+    background: rgba(216, 60, 50, 0.86);
+}
+
+.ranking-editor-toggle:hover {
+    opacity: 0.46;
+}
+
+#game-shell[data-state="menu"] .ranking-editor-toggle {
+    display: grid;
+}
+
 #hud {
     position: absolute;
     top: 18px;

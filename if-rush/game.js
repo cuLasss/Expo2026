@@ -285,6 +285,7 @@ let pendingGroundRoll = false;
 let slideTimer = 0;
 let slideElapsed = 0;
 let slideVisualDuration = GAMEPLAY.slideDuration;
+let rollRecoveryTimer = 0;
 let score = 0;
 let distance = 0;
 let runTime = 0;
@@ -323,6 +324,126 @@ const CLOUD_LOOP_LENGTH = CLOUD_COUNT * CLOUD_SPACING;
 const CLOUD_RECYCLE_Z = 82;
 const CLOUD_START_Z = CLOUD_RECYCLE_Z - CLOUD_LOOP_LENGTH;
 const CLOUD_SPEED_FACTOR = 0.44;
+const SOUND_ROOT = 'sounds/';
+
+function makeSound(path) {
+    return new Audio(encodeURI(`${SOUND_ROOT}${path}`));
+}
+
+const audioManager = {
+    sounds: {
+        bgm: makeSound('Ambiente/nintendo_style_bgm.mp3'),
+        jump: makeSound('Player/pular/mixkit-fast-transitions-swoosh-3115.wav'),
+        slide: makeSound('Player/Esquivar/mixkit-fast-transitions-swoosh-3115.wav'),
+        dodge: makeSound('Player/Esquivar/mixkit-explainer-video-game-alert-sweep-236.wav'),
+        hit: makeSound('Programa/losing/mixkit-player-losing-or-failing-2042.wav'),
+        coin: makeSound('Programa/quiz/mixkit-bonus-earned-in-video-game-2058.wav'),
+        record: makeSound('Programa/record/mixkit-game-level-completed-2059.wav'),
+        click: makeSound('Programa/button press/emilianodleon-button-ui-sound-effect-395762.mp3'),
+        run: makeSound('Player/correr/mixkit-running-through-the-forest-1232.wav'),
+        shieldUp: makeSound('Player/Shield up/bible_images-video-game-power-up-sound-effect-384657.mp3'),
+        shieldBreak: makeSound('Player/Shield break/11325622-glass-breaking-sound-effect-240679.mp3'),
+    },
+    ambientSounds: [
+        makeSound('Ambiente/animais/cachorros/mixkit-medium-size-angry-dog-bark-54.wav'),
+        makeSound('Ambiente/animais/fazenda/mixkit-cow-moo-in-the-barn-1751.wav'),
+        makeSound('Ambiente/animais/fazenda/mixkit-farm-goat-baa-1763.wav'),
+        makeSound('Ambiente/animais/gatos/mixkit-angry-cartoon-kitty-meow-94.wav'),
+        makeSound('Ambiente/animais/gatos/mixkit-domestic-cat-hungry-meow-45.wav'),
+    ],
+    ambientTimer: null,
+    currentAmbient: null,
+    init() {
+        this.sounds.bgm.loop = true;
+        this.sounds.bgm.volume = 0.3;
+        this.sounds.bgm.preload = 'metadata';
+        this.sounds.run.loop = true;
+        this.sounds.run.volume = 0.15;
+        Object.entries(this.sounds).forEach(([name, sound]) => {
+            if (name !== 'bgm' && name !== 'run') sound.volume = 0.6;
+            sound.preload = name === 'bgm' ? 'metadata' : 'auto';
+            if (name !== 'bgm') sound.load();
+        });
+        this.ambientSounds.forEach(sound => {
+            sound.volume = 0;
+            sound.preload = 'auto';
+            sound.load();
+        });
+        window.addEventListener('click', event => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest('button') || target.classList.contains('selector-btn') || target.closest('.customize-row')) {
+                this.play('click');
+            }
+        });
+    },
+    play(name) {
+        const sound = this.sounds[name];
+        if (!sound) return;
+        if (name === 'bgm' || name === 'run') {
+            sound.currentTime = 0;
+            sound.play().catch(() => { });
+            return;
+        }
+        const clone = sound.cloneNode();
+        clone.volume = sound.volume;
+        clone.play().catch(() => { });
+    },
+    stop(name) {
+        const sound = this.sounds[name];
+        if (!sound) return;
+        sound.pause();
+        sound.currentTime = 0;
+    },
+    startAmbient() {
+        if (this.ambientTimer) return;
+        const triggerAmbient = () => {
+            if (this.currentAmbient) this.fadeOutAmbient(this.currentAmbient);
+            this.currentAmbient = this.ambientSounds[Math.floor(Math.random() * this.ambientSounds.length)];
+            this.currentAmbient.currentTime = 0;
+            this.currentAmbient.play().catch(() => { });
+            this.fadeInAmbient(this.currentAmbient);
+            this.ambientTimer = setTimeout(triggerAmbient, 6000 + Math.random() * 8000);
+        };
+        this.ambientTimer = setTimeout(triggerAmbient, 2000 + Math.random() * 4000);
+    },
+    stopAmbient() {
+        if (this.ambientTimer) {
+            clearTimeout(this.ambientTimer);
+            this.ambientTimer = null;
+        }
+        if (this.currentAmbient) {
+            this.fadeOutAmbient(this.currentAmbient);
+            this.currentAmbient = null;
+        }
+    },
+    fadeInAmbient(sound) {
+        let volume = 0;
+        sound.volume = volume;
+        const fadeInterval = setInterval(() => {
+            if (volume < 0.25) {
+                volume += 0.02;
+                sound.volume = Math.min(volume, 0.25);
+            } else {
+                clearInterval(fadeInterval);
+            }
+        }, 100);
+    },
+    fadeOutAmbient(sound) {
+        let volume = sound.volume;
+        const fadeInterval = setInterval(() => {
+            if (volume > 0.02) {
+                volume -= 0.02;
+                sound.volume = Math.max(volume, 0);
+            } else {
+                sound.volume = 0;
+                sound.pause();
+                clearInterval(fadeInterval);
+            }
+        }, 100);
+    },
+};
+audioManager.init();
 
 const liveObjects = [];
 const roadSegments = [];
@@ -1047,9 +1168,9 @@ function makeCoinFaceTexture(mark = 'IF', bg = '#ffc94a', fg = '#fff8dc') {
     ctx.clearRect(0, 0, 256, 256);
 
     const grad = ctx.createRadialGradient(92, 68, 28, 128, 128, 118);
-    grad.addColorStop(0, '#fff1a8');
+    grad.addColorStop(0, mark === 'BTC' ? '#d69a2c' : '#fff1a8');
     grad.addColorStop(0.42, bg);
-    grad.addColorStop(1, mark === 'BTC' ? '#c76b09' : '#c58c18');
+    grad.addColorStop(1, mark === 'BTC' ? '#6f3e06' : '#c58c18');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(128, 128, 112, 0, Math.PI * 2);
@@ -1061,29 +1182,104 @@ function makeCoinFaceTexture(mark = 'IF', bg = '#ffc94a', fg = '#fff8dc') {
     ctx.arc(128, 128, 102, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.36)';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(128, 128, 82, Math.PI * 1.08, Math.PI * 1.72);
-    ctx.stroke();
-
-    ctx.fillStyle = fg;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (mark === 'BTC') {
-        ctx.font = '900 104px Arial, sans-serif';
-        ctx.fillText('B', 128, 132);
-        ctx.strokeStyle = fg;
-        ctx.lineWidth = 9;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(128, 128, 96, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(75, 43, 6, 0.52)';
         ctx.lineCap = 'round';
-        for (const x of [111, 129]) {
+        for (let r = 28; r <= 92; r += 6) {
+            ctx.lineWidth = r % 12 === 0 ? 2.2 : 1.2;
+            ctx.beginPath();
+            ctx.arc(128, 128, r, Math.PI * 0.08, Math.PI * 1.92);
+            ctx.stroke();
+        }
+        for (let i = 0; i < 34; i++) {
+            const angle = i * Math.PI * 2 / 34;
+            const start = 48 + (i % 4) * 6;
+            const end = 92 - (i % 3) * 5;
+            const x1 = 128 + Math.cos(angle) * start;
+            const y1 = 128 + Math.sin(angle) * start;
+            const x2 = 128 + Math.cos(angle) * end;
+            const y2 = 128 + Math.sin(angle) * end;
+            ctx.lineWidth = i % 5 === 0 ? 2.2 : 1.1;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            if (i % 3 === 0) {
+                ctx.beginPath();
+                ctx.arc(x2, y2, 2.2, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+
+        ctx.strokeStyle = 'rgba(82, 49, 8, 0.66)';
+        ctx.lineWidth = 3;
+        for (const radius of [74, 87, 98]) {
+            ctx.beginPath();
+            ctx.arc(128, 128, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(77, 43, 5, 0.7)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 42; i++) {
+            const angle = i * Math.PI * 2 / 42;
+            const inner = 101;
+            const outer = i % 2 === 0 ? 110 : 106;
+            ctx.beginPath();
+            ctx.moveTo(128 + Math.cos(angle) * inner, 128 + Math.sin(angle) * inner);
+            ctx.lineTo(128 + Math.cos(angle) * outer, 128 + Math.sin(angle) * outer);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#4a2a06';
+        ctx.font = '700 12px Arial, sans-serif';
+        ctx.fillText('BITCOIN', 128, 39);
+        ctx.fillText('BTC', 128, 220);
+
+        ctx.font = '900 112px Arial, sans-serif';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#2f1b05';
+        ctx.lineWidth = 13;
+        ctx.strokeText('B', 129, 135);
+        const bGrad = ctx.createLinearGradient(82, 64, 174, 186);
+        bGrad.addColorStop(0, '#f1d271');
+        bGrad.addColorStop(0.42, '#c98516');
+        bGrad.addColorStop(1, '#704106');
+        ctx.fillStyle = bGrad;
+        ctx.fillText('B', 129, 135);
+        ctx.strokeStyle = '#2f1b05';
+        ctx.lineWidth = 10;
+        ctx.lineCap = 'round';
+        for (const x of [111, 132]) {
             ctx.beginPath();
             ctx.moveTo(x, 62);
             ctx.lineTo(x, 194);
             ctx.stroke();
         }
-        ctx.fillText('B', 128, 132);
+        ctx.strokeStyle = '#e1bd5a';
+        ctx.lineWidth = 4;
+        for (const x of [111, 132]) {
+            ctx.beginPath();
+            ctx.moveTo(x, 62);
+            ctx.lineTo(x, 194);
+            ctx.stroke();
+        }
+        ctx.fillStyle = bGrad;
+        ctx.fillText('B', 129, 135);
     } else {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.36)';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(128, 128, 82, Math.PI * 1.08, Math.PI * 1.72);
+        ctx.stroke();
+
+        ctx.fillStyle = fg;
         ctx.font = '900 78px Outfit, Arial, sans-serif';
         ctx.fillText(mark, 128, 132);
     }
@@ -1329,6 +1525,39 @@ function createInstitute() {
         return roof;
     };
 
+    const makeFrontGableRoof = (width, depth, height, mat) => {
+        const hw = width / 2;
+        const hd = depth / 2;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            -hw, 0, -hd,
+             hw, 0, -hd,
+             hw, 0,  hd,
+            -hw, 0,  hd,
+             0, height, -hd,
+             0, height,  hd,
+        ], 3));
+        geometry.setIndex([
+            0, 3, 5, 0, 5, 4,
+            1, 4, 5, 1, 5, 2,
+            0, 4, 1,
+            3, 2, 5,
+            0, 1, 2, 0, 2, 3,
+        ]);
+        geometry.computeVertexNormals();
+        return new THREE.Mesh(geometry, mat);
+    };
+
+    const addFrontGableRoof = (width, depth, height, x, y, z, mat = roofMat) => {
+        const roof = makeFrontGableRoof(width, depth, height, mat);
+        roof.position.set(x, y, z);
+        roof.castShadow = true;
+        roof.receiveShadow = true;
+        group.add(roof);
+        addTrimBox(width + 0.8, 0.25, 0.42, x, y + 0.05, z + depth / 2 + 0.16, timberLightMat);
+        return roof;
+    };
+
     const makeHippedRoof = (width, depth, height, mat) => {
         const hw = width / 2;
         const hd = depth / 2;
@@ -1396,72 +1625,149 @@ function createInstitute() {
     const rightGableZ = -174.6;
     const porchZ = -171.7;
     const towerZ = -180.5;
+    const plinthMat = new THREE.MeshStandardMaterial({ color: 0x8b5e3c, roughness: 0.82 });
 
-    // Long colonial facade, kept behind the road end so it never fills the track.
-    addBody(54, 6.7, 6.4, -3, 3.35, frontWingZ);
-    addGableRoof(56, 8.4, 2.8, -3, 6.85, frontWingZ);
-    addTrimBox(55, 0.22, 0.28, -3, 6.25, frontZ(frontWingZ, 6.4) + 0.02, timberLightMat);
-    addTrimBox(55, 0.18, 0.25, -3, 1.0, frontZ(frontWingZ, 6.4) + 0.02, timberLightMat);
+    const addPlinth = (w, x, z, depth) => {
+        addTrimBox(w, 0.55, 0.18, x, 0.28, frontZ(z, depth) + 0.06, plinthMat);
+        addTrimBox(w, 0.08, 0.14, x, 0.58, frontZ(z, depth) + 0.05, timberMat);
+    };
+    const addCorners = (x1, x2, y, h, z) => {
+        addTrimBox(0.2, h, 0.12, x1, y, z + 0.04, timberMat);
+        addTrimBox(0.2, h, 0.12, x2, y, z + 0.04, timberMat);
+    };
+    const addBand = (w, x, y, z) => addTrimBox(w, 0.12, 0.12, x, y, z + 0.04, timberLightMat);
+    const addGableFace = (x, baseY, z, w, h) => {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([-w/2,0,0, w/2,0,0, 0,h,0], 3));
+        g.setIndex([0,1,2]); g.computeVertexNormals();
+        const m = new THREE.Mesh(g, wallMat);
+        m.position.set(x, baseY, z + 0.02); m.renderOrder = 1; group.add(m);
+    };
+    const addEnxaimel = (x, baseY, z, w, h) => {
+        addTrimBox(w*0.82, 0.18, 0.12, x, baseY+0.12, z+0.08, timberMat);
+        addTrimBox(0.18, h*0.82, 0.12, x, baseY+h*0.42, z+0.09, timberMat);
+        addTrimBox(w*0.52, 0.14, 0.1, x, baseY+h*0.45, z+0.085, timberMat);
+        const dr=h*0.72, dn=w*0.36, dl=Math.hypot(dn,dr), da=Math.atan2(dr,dn);
+        const l=addTrimBox(dl,0.16,0.11,x-w*0.18,baseY+h*0.42,z+0.09,timberMat); l.rotation.z=da;
+        const r=addTrimBox(dl,0.16,0.11,x+w*0.18,baseY+h*0.42,z+0.09,timberMat); r.rotation.z=-da;
+        const sr2=h*0.28, sn2=w*0.18, sl2=Math.hypot(sn2,sr2), sa2=Math.atan2(sr2,sn2);
+        const sl=addTrimBox(sl2,0.12,0.1,x-w*0.1,baseY+h*0.2,z+0.085,timberLightMat); sl.rotation.z=sa2;
+        const sr=addTrimBox(sl2,0.12,0.1,x+w*0.1,baseY+h*0.2,z+0.085,timberLightMat); sr.rotation.z=-sa2;
+    };
+    const addWinGroup = (cx, y, z, count, w, h, spacing) => {
+        const totalW = count*w + (count-1)*spacing;
+        addTrimBox(totalW+0.5, 0.16, 0.1, cx, y+h/2+0.22, z+0.05, timberMat);
+        addTrimBox(totalW+0.5, 0.16, 0.1, cx, y-h/2-0.22, z+0.05, timberMat);
+        addTrimBox(0.16, h+0.44, 0.1, cx-totalW/2-0.22, y, z+0.05, timberMat);
+        addTrimBox(0.16, h+0.44, 0.1, cx+totalW/2+0.22, y, z+0.05, timberMat);
+        for (let i=0; i<count; i++) {
+            const wx = cx - totalW/2 + w/2 + i*(w+spacing);
+            addWindow(wx, y, z, w, h);
+            if (i < count-1) addTrimBox(0.1, h+0.3, 0.1, wx+w/2+spacing/2, y, z+0.055, timberLightMat);
+        }
+    };
 
-    // Left fronton: one of the most recognizable IF Barbacena shapes.
-    addBody(11.8, 9.6, 7.0, -27.2, 4.8, leftGableZ);
-    addGableRoof(13.5, 8.5, 4.2, -27.2, 9.75, leftGableZ, roofMat);
-    addTimberPattern(-27.2, 7.65, frontZ(leftGableZ, 7.0), 10.4, 5.0);
-    addPlane(4.6, 0.22, -27.2, 11.55, frontZ(leftGableZ, 7.0) + 0.03, timberMat, 0.58, 6);
-    addPlane(4.6, 0.22, -27.2, 11.55, frontZ(leftGableZ, 7.0) + 0.04, timberMat, -0.58, 6);
+    // === Small connecting walls between blocks (behind, subtle) ===
+    addBody(4.5, 5.0, 5.0, -22.0, 2.5, -176.2);
+    addBody(4.5, 5.0, 5.0, -11.5, 2.5, -177.5);
+    addBody(3.5, 5.0, 5.0, 1.5, 2.5, -177.5);
+    addBody(3.5, 5.0, 5.0, 11.5, 2.5, -176.2);
+    addBody(3.0, 5.0, 5.0, 23.5, 2.5, -176.5);
 
-    // Taller central volume with hipped roof, like the historic main block.
-    addBody(16.8, 13.6, 8.8, -3.8, 6.8, centerBlockZ);
-    addHippedRoof(18.8, 10.4, 3.5, -3.8, 13.75, centerBlockZ, roofMat);
-    addTimberPattern(-3.8, 10.7, frontZ(centerBlockZ, 8.8), 13.2, 4.8);
-    addTrimBox(17.2, 0.24, 0.3, -3.8, 7.2, frontZ(centerBlockZ, 8.8) + 0.02, timberLightMat);
+    // === LEFT GABLE BLOCK (front-facing gable) ===
+    const fLG = frontZ(leftGableZ, 6.8);
+    addBody(12.8, 8.2, 6.8, -28.0, 4.1, leftGableZ);
+    addPlinth(12.4, -28.0, leftGableZ, 6.8);
+    addGableFace(-28.0, 8.2, fLG, 13.8, 3.7);
+    addEnxaimel(-28.0, 8.2, fLG, 12.0, 3.35);
+    addFrontGableRoof(15.2, 8.4, 3.7, -28.0, 8.35, leftGableZ);
+    addCorners(-33.8, -22.2, 4.1, 7.6, fLG);
+    addBand(12.4, -28.0, 5.1, fLG);
+    addWinGroup(-28.0, 3.75, fLG, 3, 1.05, 1.75, 0.8);
+    addWindow(-28.0, 6.35, fLG, 0.82, 1.15);
 
-    // Right gable and short wing leading into the tower.
-    addBody(13.4, 8.6, 6.8, 17.4, 4.3, rightGableZ);
-    addGableRoof(15.2, 8.4, 3.8, 17.4, 8.85, rightGableZ, roofMat);
-    addTimberPattern(17.4, 7.25, frontZ(rightGableZ, 6.8), 11.2, 4.7);
-    addBody(9.8, 6.2, 5.8, 25.8, 3.1, -176.8);
-    addGableRoof(11.2, 7.4, 2.8, 25.8, 6.35, -176.8, roofMat);
+    // === LEFT WING ===
+    const fFW = frontZ(frontWingZ, 5.8);
+    addBody(10.8, 5.45, 5.8, -17.1, 2.72, frontWingZ);
+    addPlinth(10.4, -17.1, frontWingZ, 5.8);
+    addGableRoof(12.2, 7.1, 2.35, -17.1, 5.62, frontWingZ);
+    addCorners(-22.1, -12.1, 2.72, 5.0, fFW);
+    addWinGroup(-17.1, 3.2, fFW, 3, 0.92, 1.7, 0.7);
 
-    // Small entrance porch centered on the road axis.
-    addBody(7.2, 5.4, 5.1, -2.2, 2.7, porchZ);
-    addGableRoof(8.5, 6.2, 2.4, -2.2, 5.58, porchZ, towerRoofMat);
-    addPlane(2.7, 3.05, -2.2, 1.85, frontZ(porchZ, 5.1), doorMat, 0, 4);
-    addPlane(3.3, 0.24, -2.2, 3.55, frontZ(porchZ, 5.1) + 0.04, timberMat, 0, 5);
+    // === CENTER BLOCK (tall, 2 stories) ===
+    const fCB = frontZ(centerBlockZ, 8.6);
+    addBody(17.2, 12.6, 8.6, -4.2, 6.3, centerBlockZ);
+    addPlinth(16.8, -4.2, centerBlockZ, 8.6);
+    addHippedRoof(19.4, 10.2, 3.45, -4.2, 12.8, centerBlockZ);
+    addCorners(-12.4, 4.0, 6.3, 12.0, fCB);
+    addBand(16.4, -4.2, 8.2, fCB);
+    addWinGroup(-4.2, 10.0, fCB, 5, 1.0, 1.65, 0.6);
+    addWinGroup(-4.2, 5.05, fCB, 5, 1.05, 1.95, 0.55);
 
-    const frontWindows = [
-        [-32.2, 3.7, frontWingZ, 6.4], [-22.4, 3.7, frontWingZ, 6.4],
-        [-15.2, 3.65, frontWingZ, 6.4], [-10.8, 3.65, frontWingZ, 6.4],
-        [4.0, 3.65, frontWingZ, 6.4], [8.4, 3.65, frontWingZ, 6.4],
-        [14.2, 3.7, frontWingZ, 6.4], [20.6, 3.65, frontWingZ, 6.4], [25.4, 3.45, -176.8, 5.8],
-        [-27.2, 4.35, leftGableZ, 7.0], [-30.0, 7.05, leftGableZ, 7.0], [-24.4, 7.05, leftGableZ, 7.0],
-        [-7.5, 5.1, centerBlockZ, 8.8], [-3.8, 5.1, centerBlockZ, 8.8], [-0.1, 5.1, centerBlockZ, 8.8],
-        [-7.5, 9.0, centerBlockZ, 8.8], [-3.8, 9.0, centerBlockZ, 8.8], [-0.1, 9.0, centerBlockZ, 8.8],
-        [17.4, 4.2, rightGableZ, 6.8], [14.8, 7.05, rightGableZ, 6.8], [20.0, 7.05, rightGableZ, 6.8],
-    ];
-    for (const [x, y, z, depth] of frontWindows) {
-        addWindow(x, y, frontZ(z, depth), 1.18, y > 6.4 ? 1.72 : 1.95);
-    }
+    // === RIGHT WING ===
+    addBody(9.9, 5.45, 5.8, 6.9, 2.72, frontWingZ);
+    addPlinth(9.5, 6.9, frontWingZ, 5.8);
+    addGableRoof(11.2, 7.1, 2.35, 6.9, 5.62, frontWingZ);
+    addCorners(2.3, 11.5, 2.72, 5.0, fFW);
+    addWinGroup(6.9, 3.2, fFW, 3, 0.92, 1.7, 0.7);
 
-    // Right tower with open-looking upper section and dark timber ribs.
+    // === RIGHT GABLE BLOCK (front-facing gable) ===
+    const fRG = frontZ(rightGableZ, 6.6);
+    addBody(12.7, 7.9, 6.6, 17.5, 3.95, rightGableZ);
+    addPlinth(12.3, 17.5, rightGableZ, 6.6);
+    addGableFace(17.5, 7.9, fRG, 13.4, 3.45);
+    addEnxaimel(17.5, 7.9, fRG, 11.8, 3.05);
+    addFrontGableRoof(15.0, 8.2, 3.45, 17.5, 8.05, rightGableZ);
+    addCorners(11.6, 23.4, 3.95, 7.4, fRG);
+    addBand(12.2, 17.5, 4.9, fRG);
+    addWinGroup(17.5, 3.65, fRG, 3, 1.0, 1.72, 0.8);
+    addWindow(17.5, 5.85, fRG, 0.78, 1.12);
+
+    // === FAR-RIGHT WING ===
+    const fRW = frontZ(-176.8, 5.5);
+    addBody(10.8, 5.4, 5.5, 25.2, 2.7, -176.8);
+    addPlinth(10.4, 25.2, -176.8, 5.5);
+    addGableRoof(12.0, 6.8, 2.25, 25.2, 5.55, -176.8);
+    addCorners(20.2, 30.2, 2.7, 5.0, fRW);
+    addWinGroup(25.2, 3.15, fRW, 3, 0.86, 1.58, 0.7);
+
+    // === PORCH / ENTRANCE ===
+    addBody(6.2, 4.25, 4.8, -2.2, 2.12, porchZ);
+    addGableRoof(7.4, 5.5, 1.9, -2.2, 4.45, porchZ, towerRoofMat);
+    addPlane(2.55, 2.95, -2.2, 1.72, frontZ(porchZ, 4.8) + 0.03, doorMat, 0, 4);
+    addTrimBox(3.2, 0.16, 0.1, -2.2, 3.38, frontZ(porchZ, 4.8)+0.05, timberMat);
+    addTrimBox(0.16, 3.4, 0.1, -3.5, 1.78, frontZ(porchZ, 4.8)+0.05, timberMat);
+    addTrimBox(0.16, 3.4, 0.1, -0.9, 1.78, frontZ(porchZ, 4.8)+0.05, timberMat);
+    addTrimBox(5.4, 0.22, 1.1, -2.2, 0.28, frontZ(porchZ, 4.8) + 0.85, mats.concrete);
+    addTrimBox(4.6, 0.18, 0.9, -2.2, 0.12, frontZ(porchZ, 4.8) + 1.34, mats.concrete);
+    addTrimBox(3.8, 0.16, 0.78, -2.2, -0.02, frontZ(porchZ, 4.8) + 1.76, mats.concrete);
+
+    // === TOWER (preserved structure, enhanced X-pattern diagonals) ===
     addBody(6.0, 24.0, 5.8, 32.2, 12.0, towerZ);
     addBody(7.2, 5.0, 6.8, 32.2, 26.4, towerZ + 0.15);
     addHippedRoof(8.6, 8.2, 2.4, 32.2, 29.2, towerZ + 0.15, towerRoofMat);
 
     const towerFront = frontZ(towerZ, 5.8);
-    for (const x of [29.55, 34.85]) addPlane(0.23, 23.8, x, 13.4, towerFront, timberMat, 0, 5);
-    for (const y of [6.8, 12.6, 18.4, 24.1]) addPlane(5.2, 0.22, 32.2, y, towerFront + 0.01, timberMat, 0, 5);
-    addPlane(0.2, 7.2, 30.9, 22.0, towerFront + 0.03, timberMat, -0.32, 6);
-    addPlane(0.2, 7.2, 33.5, 22.0, towerFront + 0.03, timberMat, 0.32, 6);
-    addWindow(32.2, 8.8, towerFront + 0.05, 1.05, 1.7);
-    addWindow(32.2, 15.0, towerFront + 0.05, 1.05, 1.9);
+    for (const x of [29.55, 34.85]) addTrimBox(0.23, 23.8, 0.12, x, 13.4, towerFront + 0.045, timberMat);
+    for (const x of [31.05, 33.35]) addTrimBox(0.13, 23.0, 0.1, x, 13.1, towerFront + 0.04, timberLightMat);
+    for (const y of [1.2, 6.8, 12.6, 18.4, 24.1]) addTrimBox(5.2, 0.2, 0.12, 32.2, y, towerFront + 0.045, timberMat);
+    for (const y of [4.0, 9.9, 15.7, 21.5]) addTrimBox(4.7, 0.11, 0.09, 32.2, y, towerFront + 0.05, timberLightMat);
+    // X-pattern diagonals matching foto1/foto2 tower
+    for (const [yB, yT] of [[6.8,12.6],[12.6,18.4],[18.4,24.1]]) {
+        const rise=yT-yB, run=2.2, dl=Math.hypot(run,rise), da=Math.atan2(rise,run), cy=(yB+yT)/2;
+        const d1=addTrimBox(dl,0.13,0.1,32.2,cy,towerFront+0.055,timberMat); d1.rotation.z=da;
+        const d2=addTrimBox(dl,0.13,0.1,32.2,cy,towerFront+0.055,timberMat); d2.rotation.z=-da;
+    }
+    addWindow(32.2, 3.8, towerFront + 0.05, 0.9, 1.55);
+    addWindow(32.2, 9.5, towerFront + 0.05, 0.9, 1.68);
+    addWindow(32.2, 15.5, towerFront + 0.05, 0.9, 1.68);
+    addWindow(32.2, 20.9, towerFront + 0.05, 0.86, 3.15);
 
-    const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.02, 24), clockMat);
-    clockFace.position.set(32.2, 21.6, towerFront + 0.13);
-    clockFace.renderOrder = 6;
-    group.add(clockFace);
-    addPlane(0.07, 0.78, 32.2, 21.75, towerFront + 0.17, timberMat, 0.05, 7);
-    addPlane(0.07, 0.64, 32.45, 21.6, towerFront + 0.18, timberMat, Math.PI / 2.5, 7);
+    const upperTowerFront = frontZ(towerZ + 0.15, 6.8);
+    addTrimBox(7.6, 0.34, 0.45, 32.2, 28.05, upperTowerFront + 0.03, timberMat);
+    addTrimBox(6.3, 0.22, 0.22, 32.2, 24.05, upperTowerFront + 0.03, timberMat);
+    for (const x of [29.85, 34.55]) addTrimBox(0.2, 4.1, 0.1, x, 26.2, upperTowerFront + 0.05, timberMat);
+    addWindow(32.2, 25.75, upperTowerFront + 0.05, 1.08, 1.7);
 
     const spireBase = new THREE.Mesh(new THREE.ConeGeometry(7.1, 3.2, 4), towerRoofMat);
     spireBase.rotation.y = Math.PI / 4;
@@ -1749,8 +2055,8 @@ function createPlayer() {
         scene.add(shadow);
 
         const shieldAura = new THREE.Mesh(
-            new THREE.SphereGeometry(1.08, 28, 18),
-            new THREE.MeshBasicMaterial({ color: 0x20c997, transparent: true, opacity: 0.18, depthWrite: false })
+            new THREE.SphereGeometry(1.16, 28, 18),
+            new THREE.MeshBasicMaterial({ color: 0x38f0c2, transparent: true, opacity: 0.24, depthWrite: false })
         );
         shieldAura.position.y = 1.75;
         shieldAura.visible = false;
@@ -1834,8 +2140,8 @@ function createPlayer() {
     scene.add(shadow);
 
     const shieldAura = new THREE.Mesh(
-        new THREE.SphereGeometry(1.28, 28, 18),
-        new THREE.MeshBasicMaterial({ color: 0x20c997, transparent: true, opacity: 0.18, depthWrite: false })
+        new THREE.SphereGeometry(1.38, 28, 18),
+        new THREE.MeshBasicMaterial({ color: 0x38f0c2, transparent: true, opacity: 0.24, depthWrite: false })
     );
     shieldAura.position.y = 2.0;
     shieldAura.visible = false;
@@ -2128,19 +2434,19 @@ function createCoinObject({ bitcoin = false } = {}) {
     const group = new THREE.Group();
     const faceMap = makeCoinFaceTexture(
         bitcoin ? 'BTC' : 'IF',
-        bitcoin ? '#f7931a' : '#ffd84a',
-        bitcoin ? '#fff9dd' : '#1f8a45'
+        bitcoin ? '#b56b08' : '#ffd84a',
+        bitcoin ? '#f7df8a' : '#1f8a45'
     );
     const edgeMat = new THREE.MeshStandardMaterial({
-        color: bitcoin ? 0xc8750d : 0xd39a22,
-        roughness: 0.38,
-        metalness: 0.18,
+        color: bitcoin ? 0x7f4a08 : 0xd39a22,
+        roughness: bitcoin ? 0.46 : 0.38,
+        metalness: bitcoin ? 0.28 : 0.18,
     });
     const faceMat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
+        color: bitcoin ? 0xd69a2c : 0xffffff,
         map: faceMap,
-        roughness: 0.28,
-        metalness: 0.12,
+        roughness: bitcoin ? 0.38 : 0.28,
+        metalness: bitcoin ? 0.18 : 0.12,
     });
     const coin = new THREE.Mesh(
         new THREE.CylinderGeometry(0.64, 0.64, 0.16, 48, 1, false),
@@ -2154,11 +2460,11 @@ function createCoinObject({ bitcoin = false } = {}) {
     const rim = new THREE.Mesh(
         new THREE.TorusGeometry(0.66, 0.045, 10, 48),
         new THREE.MeshStandardMaterial({
-            color: bitcoin ? 0xffb24a : 0xffe08a,
-            emissive: bitcoin ? 0xf7931a : 0xffc94a,
-            emissiveIntensity: bitcoin ? 0.14 : 0.08,
-            roughness: 0.3,
-            metalness: 0.1,
+            color: bitcoin ? 0x9f5e08 : 0xffe08a,
+            emissive: bitcoin ? 0x5c3200 : 0xffc94a,
+            emissiveIntensity: bitcoin ? 0.06 : 0.08,
+            roughness: bitcoin ? 0.42 : 0.3,
+            metalness: bitcoin ? 0.2 : 0.1,
         })
     );
     rim.position.z = 0.09;
@@ -2167,27 +2473,123 @@ function createCoinObject({ bitcoin = false } = {}) {
     return group;
 }
 
+function createBookObject(topic) {
+    const group = new THREE.Group();
+    const coverColor = 0x1f8a45;
+    const coverCss = '#1f8a45';
+    const coverMat = new THREE.MeshStandardMaterial({
+        color: coverColor,
+        roughness: 0.42,
+        metalness: 0.02,
+    });
+    const spineMat = new THREE.MeshStandardMaterial({
+        color: 0x146133,
+        roughness: 0.5,
+        metalness: 0.02,
+    });
+    const outlineMat = new THREE.MeshStandardMaterial({
+        color: 0x101411,
+        roughness: 0.62,
+        metalness: 0.0,
+    });
+    const pageMat = new THREE.MeshStandardMaterial({
+        color: 0xfff4d2,
+        roughness: 0.66,
+        metalness: 0.0,
+    });
+    const edgeMat = new THREE.MeshStandardMaterial({
+        color: 0xd7c49b,
+        roughness: 0.72,
+        metalness: 0.0,
+    });
+
+    const pages = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.08, 0.14), pageMat);
+    pages.position.set(0.05, -0.01, 0);
+    pages.castShadow = true;
+    pages.receiveShadow = true;
+    group.add(pages);
+
+    const backOutline = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.32, 0.045), outlineMat);
+    backOutline.position.z = -0.085;
+    backOutline.castShadow = true;
+    backOutline.receiveShadow = true;
+    group.add(backOutline);
+
+    const backCover = new THREE.Mesh(new THREE.BoxGeometry(1.02, 1.22, 0.05), coverMat.clone());
+    backCover.position.z = -0.11;
+    backCover.castShadow = true;
+    backCover.receiveShadow = true;
+    group.add(backCover);
+
+    const frontOutline = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.32, 0.045), outlineMat);
+    frontOutline.position.z = 0.085;
+    frontOutline.castShadow = true;
+    frontOutline.receiveShadow = true;
+    group.add(frontOutline);
+
+    const frontCover = new THREE.Mesh(new THREE.BoxGeometry(1.02, 1.22, 0.05), coverMat.clone());
+    frontCover.position.z = 0.115;
+    frontCover.castShadow = true;
+    frontCover.receiveShadow = true;
+    group.add(frontCover);
+
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.26, 0.22), spineMat);
+    spine.position.set(-0.52, 0, 0.01);
+    spine.castShadow = true;
+    spine.receiveShadow = true;
+    group.add(spine);
+
+    const addInkLine = (width, height, x, y) => {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.035), outlineMat);
+        line.position.set(x, y, 0.152);
+        line.castShadow = true;
+        group.add(line);
+    };
+    addInkLine(1.04, 0.045, 0, 0.62);
+    addInkLine(1.04, 0.045, 0, -0.62);
+    addInkLine(0.045, 1.22, 0.53, 0);
+    addInkLine(0.045, 1.22, -0.53, 0);
+
+    for (const y of [-0.34, 0, 0.34]) {
+        const pageLine = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.018, 0.025), outlineMat);
+        pageLine.position.set(0.1, y, 0.155);
+        pageLine.castShadow = true;
+        group.add(pageLine);
+    }
+
+    const label = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.66, 0.52),
+        new THREE.MeshBasicMaterial({
+            map: makeLabelTexture(topic?.tag || 'IF', coverCss),
+            transparent: true,
+            depthWrite: false,
+        })
+    );
+    label.position.set(0.08, 0.08, 0.171);
+    group.add(label);
+
+    const bookmark = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.48, 0.025),
+        new THREE.MeshStandardMaterial({ color: 0x93d26b, roughness: 0.45 })
+    );
+    bookmark.position.set(0.32, -0.45, 0.165);
+    bookmark.castShadow = true;
+    group.add(bookmark);
+
+    group.rotation.z = -0.12;
+    return group;
+}
+
 function createCollectible(topic, lane, z) {
     const group = new THREE.Group();
-    const coin = createCoinObject();
-    group.add(coin);
-
-    const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.86, 0.045, 8, 34),
-        new THREE.MeshBasicMaterial({ color: 0xffee8a, transparent: true, opacity: 0.62 })
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = -0.02;
-    group.add(ring);
-
-    const beam = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.38, 0.54, 2.0, 24, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0xffdf63, transparent: true, opacity: 0.1, depthWrite: false })
-    );
-    beam.position.y = 0.02;
-    group.add(beam);
+    const book = createBookObject(topic);
+    group.add(book);
 
     group.position.set(LANES[lane], 1.1, z);
+    group.userData.baseY = 1.1;
+    group.userData.bobPhase = Math.random() * Math.PI * 2;
+    group.userData.bobSpeed = 2.15;
+    group.userData.bobHeight = 0.08;
     world.add(group);
     liveObjects.push({ type: 'collectible', topic, lane, group, radius: 1.15, hit: false });
 }
@@ -2198,21 +2600,18 @@ function createPowerUp(lane, z) {
     bitcoin.scale.setScalar(1.12);
     group.add(bitcoin);
 
-    const halo = new THREE.Mesh(
-        new THREE.TorusGeometry(1.05, 0.055, 8, 36),
-        new THREE.MeshBasicMaterial({ color: 0x2b9cff, transparent: true, opacity: 0.78 })
-    );
-    halo.rotation.x = Math.PI / 2;
-    group.add(halo);
-
     const aura = new THREE.Mesh(
         new THREE.CylinderGeometry(0.5, 0.76, 2.3, 28, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0xf7931a, transparent: true, opacity: 0.14, depthWrite: false })
+        new THREE.MeshBasicMaterial({ color: 0xb56b08, transparent: true, opacity: 0.1, depthWrite: false })
     );
     aura.position.y = 0.04;
     group.add(aura);
 
     group.position.set(LANES[lane], 1.1, z);
+    group.userData.baseY = 1.1;
+    group.userData.bobPhase = Math.random() * Math.PI * 2;
+    group.userData.bobSpeed = 2.35;
+    group.userData.bobHeight = 0.12;
     world.add(group);
     liveObjects.push({ type: 'power', lane, group, radius: 1.15, hit: false });
 }
@@ -2357,21 +2756,43 @@ function spawnWave() {
     }
 }
 
-function spawnCollectibles() {
-    const unsafeLanes = new Set(
-        liveObjects
-            .filter(obj => obj.type === 'obstacle' && obj.group.position.z < -82 && obj.group.position.z > -132)
-            .map(obj => obj.lane)
-    );
-    const safeLanes = [0, 1, 2].filter(lane => !unsafeLanes.has(lane));
-    const lanePool = safeLanes.length ? safeLanes : [0, 1, 2];
-    const lane = lanePool[Math.floor(Math.random() * lanePool.length)];
-    const topic = COURSE_TOPICS[Math.floor(Math.random() * COURSE_TOPICS.length)];
-    const z = -112;
-    for (let i = 0; i < 4; i++) {
-        createCollectible(topic, lane, z - i * 4);
+function isCollectibleSpotClear(lane, z, gap = 5.8) {
+    return liveObjects.every(obj => {
+        if (obj.type !== 'obstacle' || obj.lane !== lane) return true;
+        return Math.abs(obj.group.position.z - z) >= gap;
+    });
+}
+
+function findClearCollectibleLane(zValues) {
+    return [0, 1, 2]
+        .sort(() => Math.random() - 0.5)
+        .find(lane => zValues.every(z => isCollectibleSpotClear(lane, z)));
+}
+
+function findClearCollectibleSpot(preferredLanes, zValues) {
+    const lanes = [...preferredLanes].sort(() => Math.random() - 0.5);
+    for (const lane of lanes) {
+        const z = zValues.find(candidateZ => isCollectibleSpotClear(lane, candidateZ, 6.4));
+        if (z !== undefined) return { lane, z };
     }
-    if (Math.random() > 0.72) createPowerUp((lane + 1 + Math.floor(Math.random() * 2)) % 3, z - 10);
+    return null;
+}
+
+function spawnCollectibles() {
+    const startZ = -112;
+    const bookZs = [0, -4, -8, -12].map(offset => startZ + offset);
+    const lane = findClearCollectibleLane(bookZs);
+    if (lane === undefined) return;
+    const topic = COURSE_TOPICS[Math.floor(Math.random() * COURSE_TOPICS.length)];
+    for (const z of bookZs) createCollectible(topic, lane, z);
+
+    if (Math.random() > 0.72) {
+        const powerSpot = findClearCollectibleSpot(
+            [0, 1, 2].filter(candidateLane => candidateLane !== lane),
+            [-106, -122, -130]
+        );
+        if (powerSpot) createPowerUp(powerSpot.lane, powerSpot.z);
+    }
 }
 
 function clearRunObjects() {
@@ -2486,6 +2907,7 @@ function resetGame() {
     slideTimer = 0;
     slideElapsed = 0;
     slideVisualDuration = GAMEPLAY.slideDuration;
+    rollRecoveryTimer = 0;
     topicCounts = Object.fromEntries(COURSE_TOPICS.map(topic => [topic.tag, 0]));
     player.group.position.set(0, 0, 5.2);
     player.group.rotation.set(0, 0, 0);
@@ -2503,6 +2925,9 @@ function startGame() {
     rankingEditorEnabled = false;
     activeKeys.clear();
     resetGame();
+    audioManager.play('bgm');
+    audioManager.play('run');
+    audioManager.startAmbient();
     state = 'running';
     startCameraIntro = START_CAMERA_INTRO_DURATION;
     playPlayerAction('Run');
@@ -2525,12 +2950,17 @@ function requestRetry() {
 }
 
 function endGame() {
+    audioManager.stop('bgm');
+    audioManager.stop('run');
+    audioManager.stopAmbient();
+    audioManager.play(score > bestScore ? 'record' : 'hit');
     state = 'gameover';
     isSliding = false;
     isFastDropping = false;
     pendingGroundRoll = false;
     slideTimer = 0;
     slideElapsed = 0;
+    rollRecoveryTimer = 0;
     playerVelocityY = 0;
     player.group.rotation.z = 0;
     player.group.scale.set(1, 1, 1);
@@ -2559,20 +2989,112 @@ function showLearn(topic) {
     rankingPanel.dataset.lastTopic = topic.tag;
 }
 
-function makeSpark(x, y, z, color = 0xffffff) {
+function makeSpark(x, y, z, color = 0xffffff, options = {}) {
     const spark = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 8, 6),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
+        new THREE.SphereGeometry(options.size ?? 0.08, 8, 6),
+        new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 1,
+            depthWrite: false,
+            depthTest: options.depthTest ?? true,
+        })
     );
     spark.position.set(x, y, z);
-    spark.userData.vel = new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 2.4 + 0.8, (Math.random() - 0.5) * 4);
-    spark.userData.life = 0.45;
+    spark.renderOrder = options.renderOrder ?? 0;
+    spark.userData.vel = options.velocity || new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 2.4 + 0.8, (Math.random() - 0.5) * 4);
+    spark.userData.life = options.life ?? 0.45;
+    spark.userData.maxLife = spark.userData.life;
+    spark.userData.gravity = options.gravity ?? 8;
     scene.add(spark);
     sparks.push(spark);
 }
 
 function burstAt(x, y, z, color) {
     for (let i = 0; i < 14; i++) makeSpark(x, y, z, color);
+}
+
+function collectBurstAt(x, y, z, color) {
+    for (let i = 0; i < 12; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speedOut = 1.25 + Math.random() * 2.05;
+        const sparkleColor = i % 3 === 0 ? 0xfff6c7 : color;
+        makeSpark(x, y + 0.08, z, sparkleColor, {
+            size: 0.08 + Math.random() * 0.032,
+            life: 0.42 + Math.random() * 0.14,
+            gravity: 4.4,
+            depthTest: false,
+            renderOrder: 8,
+            velocity: new THREE.Vector3(
+                Math.cos(angle) * speedOut,
+                1.25 + Math.random() * 1.55,
+                Math.sin(angle) * speedOut
+            ),
+        });
+    }
+}
+
+function cloneMaterialForDestroy(material) {
+    const cloned = material.clone();
+    cloned.transparent = true;
+    cloned.depthWrite = false;
+    cloned.opacity = 1;
+    return cloned;
+}
+
+function startShieldDestroy(obj) {
+    obj.hit = true;
+    obj.destroying = true;
+    obj.destroyTimer = 0.48;
+    obj.destroyDuration = obj.destroyTimer;
+    obj.group.userData.destroyBaseScale = obj.group.scale.clone();
+    obj.group.traverse(child => {
+        if (!child.isMesh) return;
+        child.material = Array.isArray(child.material)
+            ? child.material.map(cloneMaterialForDestroy)
+            : cloneMaterialForDestroy(child.material);
+        child.userData.destroyVelocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 2.2,
+            1.15 + Math.random() * 1.55,
+            (Math.random() - 0.5) * 2.2
+        );
+        child.userData.destroySpin = new THREE.Vector3(
+            (Math.random() - 0.5) * 5.5,
+            (Math.random() - 0.5) * 5.5,
+            (Math.random() - 0.5) * 5.5
+        );
+    });
+}
+
+function updateShieldDestroy(obj, delta) {
+    if (!obj.destroying) return false;
+    obj.destroyTimer -= delta;
+    const duration = obj.destroyDuration || 0.48;
+    const progress = THREE.MathUtils.clamp(1 - obj.destroyTimer / duration, 0, 1);
+    const fade = Math.max(0, 1 - progress);
+    const baseScale = obj.group.userData.destroyBaseScale || new THREE.Vector3(1, 1, 1);
+    obj.group.scale.copy(baseScale).multiplyScalar(1 - progress * 0.42);
+    obj.group.position.y += delta * (0.75 + progress * 0.9);
+    obj.group.rotation.y += delta * 3.8;
+    obj.group.traverse(child => {
+        if (!child.isMesh) return;
+        const velocity = child.userData.destroyVelocity;
+        const spin = child.userData.destroySpin;
+        if (velocity) {
+            velocity.y -= 2.8 * delta;
+            child.position.addScaledVector(velocity, delta);
+        }
+        if (spin) {
+            child.rotation.x += spin.x * delta;
+            child.rotation.y += spin.y * delta;
+            child.rotation.z += spin.z * delta;
+        }
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach(material => {
+            if (material) material.opacity = fade;
+        });
+    });
+    return obj.destroyTimer <= 0;
 }
 
 function showComboPopup(text, color = '#ffc94a') {
@@ -2626,12 +3148,27 @@ function isPlayerGrounded() {
 }
 
 function beginGroundRoll() {
+    if (isSliding || isFastDropping || pendingGroundRoll || slideTimer > 0 || rollRecoveryTimer > 0) return;
+    audioManager.play('slide');
     pendingGroundRoll = false;
     isFastDropping = false;
     isSliding = true;
     slideTimer = GAMEPLAY.slideDuration;
     slideElapsed = 0;
     slideVisualDuration = Math.max(slideTimer, 0.82);
+    rollRecoveryTimer = slideVisualDuration;
+    playPlayerAction('Run', { fade: 0.05 });
+}
+
+function finishPendingGroundRoll() {
+    audioManager.play('slide');
+    pendingGroundRoll = false;
+    isFastDropping = false;
+    isSliding = true;
+    slideTimer = GAMEPLAY.slideDuration;
+    slideElapsed = 0;
+    slideVisualDuration = Math.max(slideTimer, 0.82);
+    rollRecoveryTimer = slideVisualDuration;
     playPlayerAction('Run', { fade: 0.05 });
 }
 
@@ -2692,6 +3229,7 @@ function updateRunning(delta, t) {
 
     if (multiplierTimer > 0) multiplierTimer -= delta;
     if (shield > 0) shield -= delta;
+    if (rollRecoveryTimer > 0) rollRecoveryTimer = Math.max(0, rollRecoveryTimer - delta);
     const targetX = LANES[targetLaneIndex];
     player.group.position.x += (targetX - player.group.position.x) * (1 - Math.exp(-GAMEPLAY.laneEase * delta));
     const wasAirborne = player.group.position.y > 0.05;
@@ -2701,7 +3239,7 @@ function updateRunning(delta, t) {
         player.group.position.y = 0;
         playerVelocityY = 0;
         if (pendingGroundRoll) {
-            beginGroundRoll();
+            finishPendingGroundRoll();
             burstAt(player.group.position.x, 0.22, player.group.position.z - 0.25, getCurrentAccentColor());
         } else if (isFastDropping || wasAirborne) {
             isFastDropping = false;
@@ -2757,9 +3295,9 @@ function updateRunning(delta, t) {
     player.group.scale.y += (scaleTarget - player.group.scale.y) * (1 - Math.exp(-12 * delta));
     player.shieldAura.visible = shield > 0;
     if (shield > 0) {
-        const pulse = 1 + Math.sin(t * 8) * 0.06;
+        const pulse = 1.06 + Math.sin(t * 8) * 0.08;
         player.shieldAura.scale.setScalar(pulse);
-        player.shieldAura.material.opacity = 0.14 + Math.sin(t * 10) * 0.04;
+        player.shieldAura.material.opacity = 0.24 + Math.sin(t * 10) * 0.06;
     }
     player.shadow.position.set(player.group.position.x, 0.035, player.group.position.z);
     player.shadow.scale.setScalar(1 + player.group.position.y * -0.12);
@@ -2778,24 +3316,33 @@ function updateRunning(delta, t) {
         } else if (obj.obstacleType?.kind === 'slide') {
             obj.group.rotation.y = Math.sin(t * 3.2 + obj.group.position.z) * 0.08;
         }
+        if (obj.destroying) {
+            if (updateShieldDestroy(obj, delta)) obj.destroyDone = true;
+            continue;
+        }
         if (obj.type === 'collectible' || obj.type === 'power') {
-            obj.group.position.y = 1.12 + Math.sin(t * 4 + obj.group.position.z) * 0.16;
+            const baseY = obj.group.userData.baseY ?? 1.1;
+            const bobPhase = obj.group.userData.bobPhase ?? 0;
+            const bobSpeed = obj.group.userData.bobSpeed ?? 2.2;
+            const bobHeight = obj.group.userData.bobHeight ?? 0.1;
+            obj.group.position.y = baseY + Math.sin(t * bobSpeed + bobPhase) * bobHeight;
         }
         if (obj.hit) continue;
 
         const dx = Math.abs(obj.group.position.x - player.group.position.x);
         const dz = Math.abs(obj.group.position.z - player.group.position.z);
         if (obj.type === 'collectible' && dx < 1.15 && dz < 1.15) {
+            audioManager.play('coin');
             obj.hit = true;
             obj.group.visible = false;
             topicCounts[obj.topic.tag]++;
             combo++;
             comboTimer = 2.1;
             addScore(120 + Math.min(combo * 12, 140));
-            if (combo >= 4 && combo % 4 === 0) showComboPopup(`COMBO x${combo}`);
             showLearn(obj.topic);
-            burstAt(obj.group.position.x, 1.4, obj.group.position.z, obj.topic.color);
+            collectBurstAt(obj.group.position.x, 1.25, obj.group.position.z, 0x37b66a);
         } else if (obj.type === 'power' && dx < 1.15 && dz < 1.15) {
+            audioManager.play('shieldUp');
             obj.hit = true;
             obj.group.visible = false;
             shield = 6;
@@ -2803,19 +3350,21 @@ function updateRunning(delta, t) {
             combo++;
             comboTimer = 2.1;
             addScore(220);
-            showComboPopup('BITCOIN +2X', '#f7931a');
+            showComboPopup('BITCOIN!', '#f7931a');
             showLearn({ tag: 'DBG', title: 'Debug', copy: 'Programar tambem e testar, corrigir e melhorar.' });
-            burstAt(obj.group.position.x, 1.4, obj.group.position.z, 0xf7931a);
+            collectBurstAt(obj.group.position.x, 1.25, obj.group.position.z, 0xd08a20);
         } else if (obj.type === 'obstacle' && canObstacleHitPlayer(obj) && intersectsBox(getPlayerHitbox(), getObjectHitbox(obj), GAMEPLAY.collisionPadding)) {
-            obj.hit = true;
             combo = 0;
             comboTimer = 0;
             if (shield > 0) {
+                startShieldDestroy(obj);
+                audioManager.play('shieldBreak');
                 shield = 0;
                 addScore(100);
                 showComboPopup('ESCUDO!', '#20c997');
                 burstAt(obj.group.position.x, 1.2, obj.group.position.z, 0x20c997);
             } else {
+                obj.hit = true;
                 shake = 0.75;
                 burstAt(player.group.position.x, 1.2, player.group.position.z, 0xff4d4d);
                 endGame();
@@ -2832,7 +3381,7 @@ function updateRunning(delta, t) {
     }
 
     for (let i = liveObjects.length - 1; i >= 0; i--) {
-        if (liveObjects[i].group.position.z > 18 || liveObjects[i].hit) {
+        if (liveObjects[i].group.position.z > 18 || liveObjects[i].destroyDone || (liveObjects[i].hit && !liveObjects[i].destroying)) {
             liveObjects[i].group.removeFromParent();
             liveObjects.splice(i, 1);
         }
@@ -2863,9 +3412,9 @@ function updateSparks(delta) {
     for (let i = sparks.length - 1; i >= 0; i--) {
         const spark = sparks[i];
         spark.userData.life -= delta;
-        spark.userData.vel.y -= 8 * delta;
+        spark.userData.vel.y -= (spark.userData.gravity ?? 8) * delta;
         spark.position.addScaledVector(spark.userData.vel, delta);
-        spark.material.opacity = Math.max(0, spark.userData.life / 0.45);
+        spark.material.opacity = Math.max(0, spark.userData.life / (spark.userData.maxLife || 0.45));
         if (spark.userData.life <= 0) {
             spark.removeFromParent();
             sparks.splice(i, 1);
@@ -2963,6 +3512,8 @@ function updatePauseUi() {
 
 function pauseGame() {
     if (state !== 'running') return;
+    audioManager.stop('run');
+    audioManager.stopAmbient();
     state = 'paused';
     updatePauseUi();
     renderRanking();
@@ -2970,6 +3521,8 @@ function pauseGame() {
 
 function resumeGame() {
     if (state !== 'paused') return;
+    audioManager.play('run');
+    audioManager.startAmbient();
     state = 'running';
     clock.getDelta();
     playPlayerAction('Run');
@@ -2978,6 +3531,9 @@ function resumeGame() {
 }
 
 function showMenu() {
+    audioManager.stop('bgm');
+    audioManager.stop('run');
+    audioManager.stopAmbient();
     clearRunObjects();
     resetVisualWorldLoops();
     state = 'menu';
@@ -2998,12 +3554,17 @@ function showMenu() {
 
 function moveLane(dir) {
     if (state !== 'running') return;
+    const previousTarget = targetLaneIndex;
     targetLaneIndex = Math.max(0, Math.min(2, targetLaneIndex + dir));
+    if (targetLaneIndex !== previousTarget) {
+        audioManager.play('dodge');
+    }
 }
 
 function jump() {
     if (state !== 'running') return;
     if (player.group.position.y <= 0.05) {
+        audioManager.play('jump');
         playerVelocityY = GAMEPLAY.jumpVelocity;
         isSliding = false;
         isFastDropping = false;
@@ -3018,6 +3579,7 @@ function jump() {
 function slide() {
     if (state !== 'running') return;
     if (!isPlayerGrounded()) {
+        if (pendingGroundRoll || isFastDropping) return;
         pendingGroundRoll = true;
         isSliding = false;
         slideElapsed = 0;
@@ -3026,9 +3588,10 @@ function slide() {
         slideTimer = Math.max(slideTimer, GAMEPLAY.airborneSlideDuration);
         resetPlayerRootTransform();
         playPlayerAction('Jump', { fade: 0.05 });
-    } else {
-        beginGroundRoll();
+        audioManager.play('slide');
+        return;
     }
+    beginGroundRoll();
 }
 
 function openCustomize() {

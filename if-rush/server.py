@@ -11,6 +11,11 @@ ROOT = Path(__file__).resolve().parent.parent
 RANKING_PATH = ROOT / "if-rush" / "ranking.json"
 
 
+def sanitize_name(value):
+    clean = "".join(ch for ch in str(value or "").upper() if "A" <= ch <= "Z")
+    return (clean[:14] or "ALUNOIF")
+
+
 def normalize_ranking(payload):
     entries = payload.get("ranking", payload) if isinstance(payload, dict) else payload
     if not isinstance(entries, list):
@@ -26,15 +31,13 @@ def normalize_ranking(payload):
             continue
         ranking.append(
             {
-                "name": str(entry.get("name", "ALUNO IF"))[:14].upper(),
+                "name": sanitize_name(entry.get("name")),
                 "score": score,
                 "time": max(0, int(float(entry.get("time", 0) or 0))),
-                "area": str(entry.get("area", "WEB"))[:8].upper(),
-                "date": str(entry.get("date", "")),
             }
         )
 
-    ranking.sort(key=lambda item: item["score"], reverse=True)
+    ranking.sort(key=lambda item: (-item["score"], -item["time"], item["name"]))
     return ranking[:10]
 
 

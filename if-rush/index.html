@@ -17,6 +17,7 @@
 <body>
     <main id="game-shell">
         <div id="game-canvas" aria-label="IF Rush 3D"></div>
+        <button id="ranking-editor-toggle" class="ranking-editor-toggle" type="button" aria-label="Alternar edicao do ranking" aria-pressed="false"></button>
 
         <section id="hud" data-state="menu" aria-live="polite">
             <div class="hud-brand">
@@ -158,7 +159,7 @@
                 <form id="score-form" class="score-form">
                     <label for="player-name">Nome para o ranking</label>
                     <div>
-                        <input id="player-name" maxlength="14" autocomplete="off" placeholder="Seu nome" required>
+                        <input id="player-name" maxlength="14" autocomplete="off" autocapitalize="characters" inputmode="text" pattern="[A-Za-z]*" placeholder="Seu nome" required>
                         <button class="primary-btn" type="submit">Salvar</button>
                     </div>
                 </form>
