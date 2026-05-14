@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IF Rush - Corrida do Conhecimento</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
     <script type="importmap">
         {
@@ -17,7 +18,7 @@
 <body>
     <main id="game-shell">
         <div id="game-canvas" aria-label="IF Rush 3D"></div>
-        <button id="ranking-editor-toggle" class="ranking-editor-toggle" type="button" aria-label="Alternar edicao do ranking" aria-pressed="false"></button>
+        <button id="ranking-editor-toggle" class="ranking-editor-toggle" type="button" aria-label="Alternar exclusao do ranking" aria-pressed="false"></button>
 
         <section id="hud" data-state="menu" aria-live="polite">
             <div class="hud-brand">
@@ -141,6 +142,21 @@
             </div>
         </section>
 
+        <section id="quiz-panel" class="quiz-panel" hidden aria-modal="true" role="dialog" aria-labelledby="quiz-title">
+            <div class="quiz-window">
+                <span id="quiz-title" class="eyebrow">Quiz - Chance para nova vida</span>
+                <h2>Responda para continuar</h2>
+                <div class="quiz-body">
+                    <div class="quiz-content">
+                        <span id="quiz-difficulty" class="quiz-difficulty">Facil</span>
+                        <p id="quiz-question">Pergunta do curso</p>
+                        <div id="quiz-options" class="quiz-options"></div>
+                        <p id="quiz-feedback" class="quiz-feedback" aria-live="polite"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section id="game-over" class="screen" hidden>
             <div class="result-panel">
                 <span class="eyebrow">Fim da corrida</span>
@@ -159,7 +175,7 @@
                 <form id="score-form" class="score-form">
                     <label for="player-name">Nome para o ranking</label>
                     <div>
-                        <input id="player-name" maxlength="14" autocomplete="off" autocapitalize="characters" inputmode="text" pattern="[A-Za-z]*" placeholder="Seu nome" required>
+                        <input id="player-name" maxlength="14" autocomplete="off" autocapitalize="characters" inputmode="text" pattern="[A-Z]*" placeholder="Seu nome" required>
                         <button class="primary-btn" type="submit">Salvar</button>
                     </div>
                 </form>
