@@ -18,7 +18,7 @@
 <body>
     <main id="game-shell">
         <div id="game-canvas" aria-label="IF Rush 3D"></div>
-        <button id="ranking-editor-toggle" class="ranking-editor-toggle" type="button" aria-label="Alternar exclusao do ranking" aria-pressed="false"></button>
+        <button id="ranking-editor-toggle" class="ranking-editor-toggle" type="button" aria-label="Alternar exclusão do ranking" aria-pressed="false"></button>
 
         <section id="hud" data-state="menu" aria-live="polite">
             <div class="hud-brand">
@@ -41,7 +41,7 @@
 
         <section id="loading-screen" class="screen screen-open" style="z-index: 1000; background: #fff; display: flex; align-items: center; justify-content: center; flex-direction: column;">
             <div style="width: 60px; height: 60px; border: 6px solid #e0e0e0; border-top-color: #1f8a45; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <h2 style="margin-top: 24px; font-family: 'Inter', sans-serif; color: #1f8a45; font-weight: 700;">Carregando IF Rush...</h2>
+            <h2 style="margin-top: 24px; font-family: 'Outfit', 'Segoe UI', Arial, sans-serif; color: #1f8a45; font-weight: 700;">Carregando IF Rush...</h2>
             <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
         </section>
 
@@ -56,21 +56,21 @@
                 <div>
                     <span>Corredor selecionado</span>
                     <strong id="character-name">Aluno Casual</strong>
-                    <p id="character-desc">Clique em trocar personagem para preparar sua skin antes da corrida.</p>
+                    <p id="character-desc">Clique em trocar personagem para preparar o visual antes da corrida.</p>
                 </div>
-                <button id="btn-customize" class="ghost-btn" type="button">Trocar Personagem</button>
+                <button id="btn-customize" class="ghost-btn" type="button">Trocar personagem</button>
             </div>
 
             <div class="start-actions">
-                <button id="btn-start" class="primary-btn" type="button">Jogar Agora</button>
+                <button id="btn-start" class="primary-btn" type="button">Jogar agora</button>
             </div>
         </section>
 
         <section id="customize-panel" class="customize-panel" hidden>
-            <button id="customize-close" class="customize-close" type="button" aria-label="Fechar selecao">X</button>
+            <button id="customize-close" class="customize-close" type="button" aria-label="Fechar seleção">X</button>
             <div class="customize-card">
                 <span class="eyebrow">Preparar corredor</span>
-                <h2>Trocar Personagem</h2>
+                <h2>Trocar personagem</h2>
 
                 <div class="customize-row">
                     <button class="selector-btn" data-custom-region="character" data-dir="-1" type="button">&lt;</button>
@@ -93,7 +93,7 @@
                 <div id="customize-skin-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="skin" data-dir="-1" type="button">&lt;</button>
                     <div>
-                        <span>Cor de Pele</span>
+                        <span>Cor da pele</span>
                         <strong id="customize-skin-name">Pele clara</strong>
                     </div>
                     <button class="selector-btn" data-custom-region="skin" data-dir="1" type="button">&gt;</button>
@@ -112,7 +112,7 @@
                     <button class="selector-btn" data-custom-region="shirt" data-dir="-1" type="button">&lt;</button>
                     <div>
                         <span>Roupa</span>
-                        <strong id="customize-shirt-name">Uniforme padrao</strong>
+                        <strong id="customize-shirt-name">Uniforme padrão</strong>
                     </div>
                     <button class="selector-btn" data-custom-region="shirt" data-dir="1" type="button">&gt;</button>
                 </div>
@@ -120,13 +120,13 @@
                 <div id="customize-pants-row" class="customize-row">
                     <button class="selector-btn" data-custom-region="pants" data-dir="-1" type="button">&lt;</button>
                     <div>
-                        <span>Calca</span>
+                        <span>Calça</span>
                         <strong id="customize-pants-name">Jeans azul</strong>
                     </div>
                     <button class="selector-btn" data-custom-region="pants" data-dir="1" type="button">&gt;</button>
                 </div>
 
-                <button id="customize-done" class="primary-btn" type="button">Pronto Para Correr</button>
+                <button id="customize-done" class="primary-btn" type="button">Pronto para correr</button>
             </div>
         </section>
 
@@ -134,7 +134,7 @@
             <div class="pause-card">
                 <span class="eyebrow">Corrida pausada</span>
                 <h2>Pausa</h2>
-                <p>Respira, mira a proxima jogada e volta para a pista.</p>
+                <p>Respira, mira a próxima jogada e volta para a pista.</p>
                 <div class="pause-actions">
                     <button id="btn-resume" class="primary-btn" type="button">Continuar</button>
                     <button id="btn-pause-menu" class="ghost-btn" type="button">Menu</button>
@@ -148,7 +148,10 @@
                 <h2>Responda para continuar</h2>
                 <div class="quiz-body">
                     <div class="quiz-content">
-                        <span id="quiz-difficulty" class="quiz-difficulty">Facil</span>
+                        <span id="quiz-difficulty" class="quiz-difficulty" data-difficulty="easy">Fácil</span>
+                        <div id="quiz-timer" class="quiz-timer" hidden aria-hidden="true">
+                            <span id="quiz-timer-bar"></span>
+                        </div>
                         <p id="quiz-question">Pergunta do curso</p>
                         <div id="quiz-options" class="quiz-options"></div>
                         <p id="quiz-feedback" class="quiz-feedback" aria-live="polite"></p>
@@ -181,7 +184,7 @@
                 </form>
 
                 <div class="end-actions">
-                    <button id="btn-retry" class="ghost-btn" type="button">Jogar de Novo</button>
+                    <button id="btn-retry" class="ghost-btn" type="button">Jogar de novo</button>
                     <button id="btn-menu" class="ghost-btn" type="button">Menu</button>
                 </div>
             </div>
@@ -190,10 +193,10 @@
         <section id="new-run-confirm" class="confirm-panel" hidden>
             <div class="confirm-card">
                 <span class="eyebrow">Nova partida</span>
-                <h2>Comecar de novo?</h2>
-                <p>A corrida atual sera encerrada e uma nova partida vai iniciar agora.</p>
+                <h2>Começar de novo?</h2>
+                <p>A corrida atual será encerrada e uma nova partida vai iniciar agora.</p>
                 <div class="confirm-actions">
-                    <button id="btn-confirm-retry" class="primary-btn" type="button">Iniciar Nova Partida</button>
+                    <button id="btn-confirm-retry" class="primary-btn" type="button">Iniciar nova partida</button>
                     <button id="btn-cancel-retry" class="ghost-btn" type="button">Cancelar</button>
                 </div>
             </div>
@@ -201,10 +204,35 @@
 
         <section id="ranking-panel" class="ranking-panel" data-mode="full" data-state="menu" aria-live="polite">
             <div class="ranking-head">
-                <h2>Ranking Local</h2>
+                <h2>Ranking local</h2>
                 <span>Top 10</span>
             </div>
             <ol id="ranking-list"></ol>
+        </section>
+
+        <section id="music-player" class="music-player" aria-label="Player de música">
+            <div class="music-player-head">
+                <span>Tocando agora</span>
+                <strong id="music-track-label">Faixa 1 / 32</strong>
+            </div>
+            <div class="music-player-controls">
+                <button id="music-prev" type="button" aria-label="Música anterior">&lt;&lt;</button>
+                <button id="music-toggle" class="music-main-control" type="button" aria-label="Pausar ou tocar música">Tocar</button>
+                <button id="music-next" type="button" aria-label="Próxima música">&gt;&gt;</button>
+                <button id="music-random" type="button" aria-label="Alternar faixa aleatória" aria-pressed="false">
+                    <svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h2.3c1.25 0 2.42.62 3.12 1.66l5.16 7.68A3.75 3.75 0 0 0 17.7 18H20" />
+                        <path d="M17 15l3 3-3 3" />
+                        <path d="M4 17h2.3c1.25 0 2.42-.62 3.12-1.66l.8-1.2" />
+                        <path d="M13.78 9.86l.8-1.2A3.75 3.75 0 0 1 17.7 7H20" />
+                        <path d="M17 4l3 3-3 3" />
+                    </svg>
+                </button>
+            </div>
+            <label class="music-volume" for="music-volume">
+                <span>Volume</span>
+                <input id="music-volume" type="range" min="0" max="100" value="64">
+            </label>
         </section>
     </main>
 

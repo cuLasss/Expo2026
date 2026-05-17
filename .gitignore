@@ -3,10 +3,12 @@
 test-results/
 if-rush/screenshots/
 if-rush/__pycache__/
+if-rush/referencias/
 **/__pycache__/
 *.pyc
 *.pyo
 *.log
+if-rush/sounds/Ambiente/faixa *.mp3
 
 # Generated/local runtime state
 .env

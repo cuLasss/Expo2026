@@ -13,6 +13,8 @@ const gameOverScreen = document.getElementById('game-over');
 const pausePanel = document.getElementById('pause-panel');
 const quizPanel = document.getElementById('quiz-panel');
 const quizDifficulty = document.getElementById('quiz-difficulty');
+const quizTimer = document.getElementById('quiz-timer');
+const quizTimerBar = document.getElementById('quiz-timer-bar');
 const quizQuestion = document.getElementById('quiz-question');
 const quizOptions = document.getElementById('quiz-options');
 const quizFeedback = document.getElementById('quiz-feedback');
@@ -29,6 +31,13 @@ const rankingPanel = document.getElementById('ranking-panel');
 const rankingList = document.getElementById('ranking-list');
 const rankingLimit = rankingPanel.querySelector('.ranking-head span');
 const rankingEditorToggle = document.getElementById('ranking-editor-toggle');
+const musicPlayer = document.getElementById('music-player');
+const musicTrackLabel = document.getElementById('music-track-label');
+const musicPrev = document.getElementById('music-prev');
+const musicToggle = document.getElementById('music-toggle');
+const musicNext = document.getElementById('music-next');
+const musicRandom = document.getElementById('music-random');
+const musicVolume = document.getElementById('music-volume');
 const scoreForm = document.getElementById('score-form');
 const scoreFormLabel = scoreForm.querySelector('label');
 const scoreFormSubmit = scoreForm.querySelector('button[type="submit"]');
@@ -67,12 +76,12 @@ const BUILDING_ROOT = 'assets/models/buildings/FBX/';
 const TEXTURE_ROOT = 'assets/textures/ambientcg/';
 const COURSE_TOPICS = [
     { tag: 'WEB', title: 'Desenvolvimento Web', copy: 'Sites e apps que rodam no navegador.', color: 0x2b9cff },
-    { tag: 'IA', title: 'Inteligencia Artificial', copy: 'Sistemas que aprendem padroes e ajudam pessoas.', color: 0x8f62ff },
-    { tag: 'BD', title: 'Banco de Dados', copy: 'Organizacao das informacoes por tras dos sistemas.', color: 0xffb020 },
-    { tag: 'RED', title: 'Redes', copy: 'Computadores conversando com seguranca e velocidade.', color: 0x20c997 },
-    { tag: 'GAM', title: 'Games', copy: 'Logica, arte, fisica e interacao virando jogo.', color: 0xff5d8f },
-    { tag: 'SEG', title: 'Seguranca', copy: 'Protecao de dados, sistemas e pessoas online.', color: 0xff5a4f },
-    { tag: 'ROB', title: 'Robotica', copy: 'Codigo controlando sensores, motores e ideias reais.', color: 0x4cc9f0 },
+    { tag: 'IA', title: 'Inteligência Artificial', copy: 'Sistemas que aprendem padrões e ajudam pessoas.', color: 0x8f62ff },
+    { tag: 'BD', title: 'Banco de Dados', copy: 'Organização das informações por trás dos sistemas.', color: 0xffb020 },
+    { tag: 'RED', title: 'Redes', copy: 'Computadores conversando com segurança e velocidade.', color: 0x20c997 },
+    { tag: 'GAM', title: 'Games', copy: 'Lógica, arte, física e interação virando jogo.', color: 0xff5d8f },
+    { tag: 'SEG', title: 'Segurança', copy: 'Proteção de dados, sistemas e pessoas online.', color: 0xff5a4f },
+    { tag: 'ROB', title: 'Robótica', copy: 'Código controlando sensores, motores e ideias reais.', color: 0x4cc9f0 },
 ];
 
 const PRESETS = {
@@ -85,14 +94,13 @@ const PRESETS = {
     ],
     skin: [
         { label: 'Pele clara', color: 0xffd2bd },
-        { label: 'Pele rosada', color: 0xffc8a8 },
-        { label: 'Pele media', color: 0xc18164 },
+        { label: 'Pele média', color: 0xc18164 },
         { label: 'Pele morena', color: 0x8b5e3c },
         { label: 'Pele escura', color: 0x5b3621 },
     ],
     shirt: [
         { label: 'Uniforme IF', color: 0x1f8a45 },
-        { label: 'Azul informatica', color: 0x2b9cff },
+        { label: 'Azul informática', color: 0x2b9cff },
         { label: 'Coral games', color: 0xe26b5c },
         { label: 'Grafite hacker', color: 0x37474f },
         { label: 'Dourado expo', color: 0xffc94a },
@@ -101,8 +109,8 @@ const PRESETS = {
         { label: 'Jeans azul', color: 0x3d5c8c },
         { label: 'Jeans claro', color: 0x6e8db5 },
         { label: 'Jeans escuro', color: 0x1f3147 },
-        { label: 'Calca preta', color: 0x1a1a1a },
-        { label: 'Calca caqui', color: 0x8a7a5c },
+        { label: 'Calça preta', color: 0x1a1a1a },
+        { label: 'Calça caqui', color: 0x8a7a5c },
     ],
     eyebrow: [
         { label: 'Sobrancelha preta', color: 0x1a1a1a },
@@ -127,8 +135,8 @@ const PRESETS = {
         { label: 'Doutora Jovem', file: 'Doctor_Female_Young.gltf' },
         { label: 'Chef', file: 'Chef_Male.gltf' },
         { label: 'Chef Feminina', file: 'Chef_Female.gltf' },
-        { label: 'Funcionario', file: 'Worker_Male.gltf' },
-        { label: 'Funcionaria', file: 'Worker_Female.gltf' },
+        { label: 'Funcionário', file: 'Worker_Male.gltf' },
+        { label: 'Funcionária', file: 'Worker_Female.gltf' },
         { label: 'Soldado', file: 'Soldier_Male.gltf' },
         { label: 'Soldada', file: 'Soldier_Female.gltf' },
         { label: 'Soldado Azul', file: 'BlueSoldier_Male.gltf' },
@@ -212,13 +220,13 @@ const MATERIAL_TARGETS = {
 };
 
 const OBSTACLE_TYPES = [
-    { id: 'trafficCones', cue: 'PULE', color: 0xff7a1a, kind: 'jump', hitbox: { halfX: 0.9, halfY: 0.48, halfZ: 0.4, centerY: 0.48 } },
-    { id: 'lowBarrier', cue: 'PULE', color: 0xffc94a, kind: 'jump', hitbox: { halfX: 0.98, halfY: 0.44, halfZ: 0.38, centerY: 0.46 } },
-    { id: 'crateStack', cue: 'PULE', color: 0xd7c7ad, kind: 'jump', hitbox: { halfX: 0.8, halfY: 0.62, halfZ: 0.54, centerY: 0.62 } },
-    { id: 'roadBlock', cue: 'DESVIE', color: 0x18d72f, kind: 'block', multiLane: true, hitbox: { halfX: 1.14, halfY: 1.06, halfZ: 0.5, centerY: 1.08 } },
-    { id: 'overheadSign', cue: 'ABAIXE', color: 0x2b9cff, kind: 'slide', hitbox: { halfX: 1.12, halfY: 0.46, halfZ: 0.44, centerY: 2.05 } },
-    { id: 'snakeDesk', cue: 'ABAIXE', color: 0xf28b30, kind: 'slide', multiLane: true, weight: 0.45, hitbox: { halfX: 5.65, halfY: 1.08, halfZ: 1.0, centerY: 2.96 } },
-    { id: 'crtRunner', cue: 'DESVIE', color: 0x26d960, kind: 'block', weightStart: 0.45, weightEnd: 1.2, solo: true, hitbox: { halfX: 0.72, halfY: 0.96, halfZ: 0.48, centerY: 1.18 } },
+    { id: 'trafficCones', cue: 'PULE', color: 0x18d72f, kind: 'jump', weight: 0.42, hitbox: { halfX: 1.34, halfY: 0.5, halfZ: 0.46, centerY: 0.5 } },
+    { id: 'lowBarrier', cue: 'ABAIXE', color: 0x19d94d, kind: 'slide', multiLane: true, weight: 1.08, hitbox: { halfX: 5.74, halfY: 1.42, halfZ: 0.58, centerY: 3.18 } },
+    { id: 'crateStack', cue: 'PULE', color: 0xd7c7ad, kind: 'jump', weight: 1.12, hitbox: { halfX: 0.86, halfY: 0.68, halfZ: 0.58, centerY: 0.68 } },
+    { id: 'roadBlock', cue: 'DESVIE', color: 0x18d72f, kind: 'block', multiLane: true, weight: 0.84, hitbox: { halfX: 1.14, halfY: 1.06, halfZ: 0.5, centerY: 1.08 } },
+    { id: 'overheadSign', cue: 'ABAIXE', color: 0x2b9cff, kind: 'slide', multiLane: true, weight: 0.92, hitbox: { halfX: 5.72, halfY: 1.18, halfZ: 0.72, centerY: 3.58 } },
+    { id: 'snakeDesk', cue: 'DESVIE', color: 0x5f7d36, kind: 'block', weight: 0.74, hitbox: { halfX: 1.12, halfY: 2.16, halfZ: 0.78, centerY: 2.16 } },
+    { id: 'crtRunner', cue: 'DESVIE', color: 0x26d960, kind: 'block', weightStart: 0.42, weightEnd: 1.15, solo: true, hitbox: { halfX: 0.72, halfY: 0.96, halfZ: 0.48, centerY: 1.18 } },
 ];
 
 const GAMEPLAY = {
@@ -229,12 +237,12 @@ const GAMEPLAY = {
     slideHalfY: 0.54,
     slideCenterY: 0.58,
     slideHalfZ: 0.68,
-    startSpeed: 19.5,
-    maxSpeed: 49,
-    acceleration: 0.38,
+    startSpeed: 20.5,
+    maxSpeed: 70,
+    acceleration: 0.58,
     gravity: 31,
     jumpVelocity: 12.4,
-    fastDropVelocity: 19,
+    fastDropVelocity: 24,
     laneEase: 11.4,
     slideDuration: 0.58,
     airborneSlideDuration: 0.46,
@@ -283,64 +291,255 @@ const SHIELD_VISUAL = {
 };
 
 const DIFFICULTY_TUNING = {
-    rampSeconds: 150,
-    spawnStart: 1.22,
-    spawnEnd: 0.46,
-    secondObstacleStart: 0.44,
-    secondObstacleEnd: 0.78,
-    thirdObstacleStart: 0.02,
-    thirdObstacleEnd: 0.3,
-    powerChanceStart: 0.15,
-    powerChanceEnd: 0.055,
-    powerCooldownStart: 10,
-    powerCooldownEnd: 17,
-    crtChargeSpeedStart: 28,
-    crtChargeSpeedEnd: 68,
-    crtTelegraphStart: 1.15,
-    crtTelegraphEnd: 0.58,
+    rampSeconds: 85,
+    spawnStart: 1.28,
+    spawnEnd: 0.42,
+    secondObstacleStart: 0.24,
+    secondObstacleEnd: 0.76,
+    thirdObstacleStart: 0,
+    thirdObstacleEnd: 0.34,
+    powerChanceStart: 0.24,
+    powerChanceEnd: 0.13,
+    powerCooldownStart: 6,
+    powerCooldownEnd: 9.5,
+    crtChargeSpeedStart: 31,
+    crtChargeSpeedEnd: 82,
+    crtTelegraphStart: 1.08,
+    crtTelegraphEnd: 0.5,
 };
 
-const QUIZ_RULES = [
-    { id: 'easy', label: 'Facil', maxRunTime: 55, optionCount: 2 },
-    { id: 'medium', label: 'Medio', maxRunTime: 125, optionCount: 2 },
-    { id: 'hard', label: 'Dificil', maxRunTime: Infinity, optionCount: 3 },
-];
+const QUIZ_RULES = {
+    easy: { id: 'easy', label: 'Fácil', optionCount: 2, timeLimit: null },
+    medium: { id: 'medium', label: 'Médio', optionCount: 2, timeLimit: 22 },
+    hard: { id: 'hard', label: 'Difícil', optionCount: 3, timeLimit: 16 },
+};
+
+const DEBUG_QUIZ_ORDERED_TEST = false;
+const QUIZ_SUCCESS_DELAY = 620;
+const QUIZ_FAIL_REVEAL_DELAY = 2200;
+
+const OBSTACLE_REPEAT_MEMORY = 4;
+const OBSTACLE_REPEAT_PENALTIES = [0.06, 0.18, 0.38, 0.58];
+const OBSTACLE_SPACING_CONFLICTS = {
+    lowBarrier: { overheadSign: [0.02, 0.24] },
+    overheadSign: { lowBarrier: [0.02, 0.24] },
+};
 
 const QUIZ_QUESTIONS = [
     {
         difficulty: 'easy',
-        question: 'Qual area cuida da organizacao das informacoes de um sistema?',
+        question: 'Qual a duração do curso técnico integrado em Informática?',
+        options: ['2 anos', '4 anos'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno aprende linguagens muito utilizadas no mercado?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno do curso técnico aprende a desenvolver estas tecnologias, exceto:',
+        options: ['Banco de dados para empresas', 'Sistema bancário'],
+        answer: 1,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O curso tem uma disciplina de Inglês técnico?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno aprende a montar e realizar manutenção de computadores?',
+        options: ['Sim, faz parte da grade de hardware', 'Não, o curso é focado exclusivamente em software'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'Além de programar, o aluno aprende sobre Redes de Computadores?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno do curso técnico tem acesso às três refeições diárias gratuitas?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno do curso técnico pode ter acesso a bolsas de estudo?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'No curso de TI é ensinado sobre como ser um empreendedor?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'O aluno do curso técnico pode ter acesso a um estágio remunerado durante o curso?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'easy',
+        question: 'Qual área cuida da organização das informações de um sistema?',
         options: ['Banco de Dados', 'Modelagem 3D'],
         answer: 0,
     },
     {
         difficulty: 'easy',
-        question: 'HTML e usado principalmente para estruturar paginas web?',
-        options: ['Sim', 'Nao'],
+        question: 'HTML é usado principalmente para estruturar páginas web?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Quantos laboratórios práticos o curso possui?',
+        options: ['2 laboratórios práticos', '4 laboratórios práticos', '6 laboratórios práticos'],
+        answer: 1,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Qual linguagem é comum no início do curso para aprender Lógica de Programação?',
+        options: ['Python ou C', 'Assembly'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Quantas matérias únicas o curso de T.I. possui?',
+        options: ['15 matérias únicas', '20 matérias únicas'],
+        answer: 1,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Comparada a uma linguagem de baixo nível, uma linguagem de alto nível como Python costuma priorizar legibilidade e produtividade, mas pode ser:',
+        options: ['Mais lenta em algumas situações', 'Sempre mais rápida em qualquer situação'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'No aprendizado de Banco de Dados, qual linguagem é padrão para realizar consultas?',
+        options: ['HTML', 'SQL'],
+        answer: 1,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Uma linguagem de alto nível se caracteriza por:',
+        options: ['Estar mais próxima da linguagem humana', 'Estar mais próxima da linguagem de máquina'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'O curso não aborda conceitos de segurança da informação e proteção de dados.',
+        options: ['Verdadeiro', 'Falso'],
+        answer: 1,
+    },
+    {
+        difficulty: 'medium',
+        question: 'O aluno aprende a utilizar sistemas operacionais de código aberto, como o Linux?',
+        options: ['Sim', 'Não'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'Qual destes eventos acadêmicos o aluno não consegue participar?',
+        options: ['Programmers Guild', 'FECIB'],
+        answer: 0,
+    },
+    {
+        difficulty: 'medium',
+        question: 'O curso técnico de Informática é oferecido em EAD?',
+        options: ['Verdadeiro', 'Falso'],
         answer: 0,
     },
     {
         difficulty: 'medium',
         question: 'Em redes, o IP ajuda a identificar dispositivos conectados?',
-        options: ['Sim', 'Nao'],
+        options: ['Sim', 'Não'],
         answer: 0,
     },
     {
         difficulty: 'medium',
-        question: 'Qual pratica ajuda a proteger contas online?',
+        question: 'Qual prática ajuda a proteger contas online?',
         options: ['Usar senhas fortes', 'Repetir a mesma senha'],
         answer: 0,
     },
     {
         difficulty: 'hard',
-        question: 'Qual conceito descreve uma funcao chamando a si mesma?',
-        options: ['Recursao', 'Renderizacao', 'Roteamento'],
+        question: 'O que é um ponteiro em programação?',
+        options: ['Uma variável que armazena o endereço de memória de outra variável', 'Um comando que desenha setas na tela', 'Um tipo de arquivo usado para guardar imagens'],
         answer: 0,
     },
     {
         difficulty: 'hard',
-        question: 'Em programacao, o que costuma representar um booleano?',
-        options: ['Verdadeiro ou falso', 'Uma imagem 3D', 'Um arquivo de audio'],
+        question: 'No desenvolvimento web, para que serve o CSS?',
+        options: ['Para criar a estrutura e o texto do site', 'Para definir o estilo, cores e layout da página', 'Para gerenciar o banco de dados do site'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Qual a diferença entre pré-incremento (++x) e pós-incremento (x++) em C?',
+        options: ['++x incrementa depois da variável ser usada, enquanto x++ incrementa antes', '++x incrementa antes da variável ser usada, enquanto x++ incrementa depois', 'Não há diferença em nenhuma situação'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Qual é a principal função de um compilador em um ambiente de desenvolvimento?',
+        options: ['Executar o código linha por linha diretamente', 'Traduzir todo o código de alto nível em linguagem de máquina de uma só vez', 'Armazenar os dados na memória RAM de forma temporária'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'O que é uma variável na programação?',
+        options: ['Um erro no código que impede a execução', 'Um espaço na memória reservado para armazenar um dado que pode mudar', 'Uma peça física do computador'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Na disciplina de Desenvolvimento Web, qual tecnologia é usada para adicionar interatividade às páginas?',
+        options: ['CSS', 'JavaScript', 'HTML'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'O que faz o protocolo DHCP em uma rede de computadores?',
+        options: ['Realiza uma interconexão entre as máquinas da rede', 'Fornece automaticamente um endereço IP às máquinas da rede', 'Restaura o computador para o modelo de fábrica'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Quando a internet foi criada?',
+        options: ['1969', '1950', '1971'],
+        answer: 0,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Quantos bits possui um byte?',
+        options: ['12 bits', '8 bits', '4 bits'],
+        answer: 1,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Em Banco de Dados, qual recurso relaciona uma tabela com a chave primária de outra tabela?',
+        options: ['Chave estrangeira', 'Classe CSS', 'Endereço DHCP'],
+        answer: 0,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Qual conceito descreve uma função chamando a si mesma?',
+        options: ['Recursão', 'Renderização', 'Roteamento'],
+        answer: 0,
+    },
+    {
+        difficulty: 'hard',
+        question: 'Em programação, o que costuma representar um booleano?',
+        options: ['Verdadeiro ou falso', 'Uma imagem 3D', 'Um arquivo de áudio'],
         answer: 0,
     },
 ];
@@ -398,8 +597,10 @@ scene.add(world);
 let state = 'menu';
 let activeQuiz = null;
 let quizRescueCount = 0;
-let quizQuestionCursor = 0;
+let quizQuestionPools = {};
+let quizOrderedTestCursor = 0;
 let quizSerial = 0;
+let quizInvulnerabilityTimer = 0;
 let laneIndex = 1;
 let targetLaneIndex = 1;
 let laneSlideKick = 0;
@@ -423,6 +624,7 @@ let powerCooldownTimer = 0;
 let shake = 0;
 let combo = 0;
 let comboTimer = 0;
+let recentObstacleIds = [];
 let savedCurrentScore = false;
 let currentRunRank = null;
 let rankingEditorEnabled = false;
@@ -453,16 +655,21 @@ const CLOUD_RECYCLE_Z = 82;
 const CLOUD_START_Z = CLOUD_RECYCLE_Z - CLOUD_LOOP_LENGTH;
 const CLOUD_SPEED_FACTOR = 0.44;
 const SOUND_ROOT = 'sounds/';
+const MUSIC_TRACKS = Array.from({ length: 32 }, (_, index) => `Ambiente/tracks/faixa_${index + 1}.mp3`);
+const MUSIC_VOLUME_MAX = 0.44;
+const MUSIC_VOLUME_DEFAULT = 0.28;
+const MUSIC_AUTOPLAY_CLICK_DELAY = 180;
+const MUSIC_AUTOPLAY_UNMUTE_DELAYS = [240, 760, 1500, 2600];
+const QUIZ_MUSIC_FILE = null; // Troque pelo caminho do MP3 do quiz quando a faixa estiver pronta.
+const QUIZ_RECOVERY_INVULNERABILITY = 2;
 const SOUND_FILES = {
-    bgm: 'Ambiente/nintendo_style_bgm.mp3',
     jump: 'Player/pular/mixkit-fast-transitions-swoosh-3115.wav',
     slide: 'Player/Esquivar/mixkit-fast-transitions-swoosh-3115.wav',
     dodge: 'Player/Esquivar/mixkit-explainer-video-game-alert-sweep-236.wav',
     hit: 'Programa/losing/mixkit-player-losing-or-failing-2042.wav',
     coin: 'Programa/quiz/mixkit-bonus-earned-in-video-game-2058.wav',
+    quizOpen: 'Programa/quiz/mixkit-bonus-earned-in-video-game-2058.wav',
     record: 'Programa/record/mixkit-game-level-completed-2059.wav',
-    click: 'Programa/button press/emilianodleon-button-ui-sound-effect-395762.mp3',
-    run: 'Player/correr/mixkit-running-through-the-forest-1232.wav',
     shieldUp: 'Player/Shield up/bible_images-video-game-power-up-sound-effect-384657.mp3',
     shieldBreak: 'Player/Shield break/11325622-glass-breaking-sound-effect-240679.mp3',
 };
@@ -472,16 +679,27 @@ function makeSound(path) {
 }
 
 const audioManager = {
+    musicTracks: MUSIC_TRACKS,
+    musicAudio: makeSound(MUSIC_TRACKS[0]),
+    quizMusicAudio: QUIZ_MUSIC_FILE ? makeSound(QUIZ_MUSIC_FILE) : null,
+    musicIndex: 0,
+    musicVolume: MUSIC_VOLUME_DEFAULT,
+    musicShuffle: false,
+    musicShouldPlay: false,
+    musicPausedByUser: false,
+    musicAutoStartPending: false,
+    musicMutedByAutoplay: false,
+    musicPlayRequest: 0,
+    musicUnmuteTimers: [],
+    musicWasPlayingBeforeQuiz: false,
     sounds: {
-        bgm: makeSound(SOUND_FILES.bgm),
         jump: makeSound(SOUND_FILES.jump),
         slide: makeSound(SOUND_FILES.slide),
         dodge: makeSound(SOUND_FILES.dodge),
         hit: makeSound(SOUND_FILES.hit),
         coin: makeSound(SOUND_FILES.coin),
+        quizOpen: makeSound(SOUND_FILES.quizOpen),
         record: makeSound(SOUND_FILES.record),
-        click: makeSound(SOUND_FILES.click),
-        run: makeSound(SOUND_FILES.run),
         shieldUp: makeSound(SOUND_FILES.shieldUp),
         shieldBreak: makeSound(SOUND_FILES.shieldBreak),
     },
@@ -497,7 +715,7 @@ const audioManager = {
     audioContext: null,
     audioBuffers: {},
     decodingBuffers: {},
-    webAudioNames: new Set(['coin', 'slide', 'jump', 'dodge', 'hit', 'record', 'click', 'shieldUp', 'shieldBreak']),
+    webAudioNames: new Set(['coin', 'slide', 'jump', 'dodge', 'hit', 'quizOpen', 'record', 'shieldUp', 'shieldBreak']),
     soundOffsets: {
         coin: 0.005,
         slide: 0.06,
@@ -505,8 +723,8 @@ const audioManager = {
     },
     poolSizes: {
         coin: 8,
+        quizOpen: 3,
         shieldUp: 4,
-        click: 4,
         jump: 3,
         slide: 3,
         dodge: 3,
@@ -546,15 +764,23 @@ const audioManager = {
         this.webAudioNames.forEach(name => this.loadBuffer(name));
     },
     init() {
-        this.sounds.bgm.loop = true;
-        this.sounds.bgm.volume = 0.3;
-        this.sounds.bgm.preload = 'metadata';
-        this.sounds.run.loop = true;
-        this.sounds.run.volume = 0.15;
+        this.musicAudio.loop = false;
+        this.musicAudio.volume = this.musicVolume;
+        this.musicAudio.preload = 'metadata';
+        this.musicAudio.addEventListener('play', updateMusicUi);
+        this.musicAudio.addEventListener('pause', updateMusicUi);
+        this.musicAudio.addEventListener('ended', () => {
+            if (this.musicShouldPlay) this.nextMusic({ user: false, forcePlay: true });
+        });
+        if (this.quizMusicAudio) {
+            this.quizMusicAudio.loop = true;
+            this.quizMusicAudio.volume = Math.min(this.musicVolume, 0.3);
+            this.quizMusicAudio.preload = 'metadata';
+        }
         Object.entries(this.sounds).forEach(([name, sound]) => {
-            if (name !== 'bgm' && name !== 'run') sound.volume = 0.6;
-            sound.preload = name === 'bgm' ? 'metadata' : 'auto';
-            if (name !== 'bgm') sound.load();
+            sound.volume = 0.6;
+            sound.preload = 'auto';
+            sound.load();
         });
         Object.entries(this.poolSizes).forEach(([name, size]) => {
             const source = this.sounds[name];
@@ -574,25 +800,246 @@ const audioManager = {
             sound.load();
         });
         this.webAudioNames.forEach(name => this.loadBuffer(name));
-        window.addEventListener('pointerdown', () => this.unlock(), { passive: true });
-        window.addEventListener('keydown', () => this.unlock(), { passive: true });
-        window.addEventListener('click', event => {
-            const target = event.target;
-            if (!(target instanceof Element)) return;
-            if (target.closest('button') || target.classList.contains('selector-btn') || target.closest('.customize-row')) {
-                this.play('click');
+        const unlockAndResume = event => {
+            this.unlock();
+            this.resumePendingMusic(event);
+        };
+        window.addEventListener('pointerdown', unlockAndResume, { passive: true });
+        window.addEventListener('keydown', unlockAndResume, { passive: true });
+        updateMusicUi();
+    },
+    getMusicSrc(index = this.musicIndex) {
+        return encodeURI(`${SOUND_ROOT}${this.musicTracks[index]}`);
+    },
+    setMusicIndex(index, { play = this.musicShouldPlay, user = false } = {}) {
+        if (!this.musicTracks.length) return;
+        const nextIndex = (index + this.musicTracks.length) % this.musicTracks.length;
+        const changed = nextIndex !== this.musicIndex;
+        this.musicIndex = nextIndex;
+        if (user && play) this.musicPausedByUser = false;
+        if (changed || !this.musicAudio.src) {
+            this.musicAudio.pause();
+            this.musicAudio.src = this.getMusicSrc(nextIndex);
+            try {
+                this.musicAudio.currentTime = 0;
+            } catch {
+                // Ignore browsers that only allow seeking after metadata is loaded.
             }
-        });
+            this.musicAudio.load();
+        }
+        if (play) this.playMusic({ user: false });
+        else updateMusicUi();
+    },
+    playMusic({ user = true, allowMutedFallback = !user } = {}) {
+        if (user) {
+            this.musicPausedByUser = false;
+            this.musicAutoStartPending = false;
+            this.musicMutedByAutoplay = false;
+        }
+        this.unlock();
+        this.musicShouldPlay = true;
+        const requestId = ++this.musicPlayRequest;
+        this.musicAudio.muted = false;
+        this.musicAudio.volume = this.musicVolume;
+        this.musicAudio.play()
+            .then(() => {
+                this.musicAutoStartPending = false;
+                this.musicMutedByAutoplay = false;
+                updateMusicUi();
+            })
+            .catch(() => {
+                if (requestId !== this.musicPlayRequest) return;
+                if (allowMutedFallback && !this.musicPausedByUser) {
+                    this.playMutedUntilInteraction(requestId);
+                    return;
+                }
+                this.musicShouldPlay = false;
+                this.musicAutoStartPending = false;
+                this.musicMutedByAutoplay = false;
+                updateMusicUi();
+            });
+        updateMusicUi();
+    },
+    playMutedUntilInteraction(requestId) {
+        if (requestId !== this.musicPlayRequest || this.musicPausedByUser) return;
+        this.musicShouldPlay = true;
+        this.musicAutoStartPending = true;
+        this.musicMutedByAutoplay = true;
+        this.musicAudio.muted = true;
+        this.musicAudio.volume = this.musicVolume;
+        this.musicAudio.play()
+            .then(() => updateMusicUi())
+            .catch(() => {
+                if (requestId !== this.musicPlayRequest) return;
+                this.musicShouldPlay = false;
+                this.musicMutedByAutoplay = false;
+                updateMusicUi();
+            });
+        this.scheduleAutoplayUnmute(requestId);
+        updateMusicUi();
+    },
+    clearAutoplayUnmuteTimers() {
+        this.musicUnmuteTimers.forEach(timer => window.clearTimeout(timer));
+        this.musicUnmuteTimers = [];
+    },
+    scheduleAutoplayUnmute(requestId) {
+        this.clearAutoplayUnmuteTimers();
+        this.musicUnmuteTimers = MUSIC_AUTOPLAY_UNMUTE_DELAYS.map(delay => (
+            window.setTimeout(() => this.tryAutoplayUnmute(requestId), delay)
+        ));
+    },
+    tryAutoplayUnmute(requestId) {
+        if (requestId !== this.musicPlayRequest || this.musicPausedByUser || !this.musicMutedByAutoplay) return;
+        this.musicAudio.muted = false;
+        this.musicAudio.volume = this.musicVolume;
+        this.musicAudio.play()
+            .then(() => {
+                this.musicAutoStartPending = false;
+                this.musicMutedByAutoplay = false;
+                this.clearAutoplayUnmuteTimers();
+                updateMusicUi();
+            })
+            .catch(() => {
+                if (requestId !== this.musicPlayRequest || this.musicPausedByUser) return;
+                this.musicAudio.muted = true;
+                this.musicAutoStartPending = true;
+                this.musicMutedByAutoplay = true;
+                updateMusicUi();
+            });
+    },
+    pauseMusic({ user = true } = {}) {
+        if (user) {
+            this.musicPausedByUser = true;
+        }
+        this.clearAutoplayUnmuteTimers();
+        this.musicShouldPlay = false;
+        this.musicAutoStartPending = false;
+        this.musicMutedByAutoplay = false;
+        this.musicPlayRequest++;
+        this.musicAudio.muted = false;
+        this.musicAudio.pause();
+        updateMusicUi();
+    },
+    pauseMusicForGameOver() {
+        this.clearAutoplayUnmuteTimers();
+        this.musicPausedByUser = false;
+        this.musicShouldPlay = false;
+        this.musicAutoStartPending = false;
+        this.musicMutedByAutoplay = false;
+        this.musicPlayRequest++;
+        this.musicAudio.muted = false;
+        this.musicAudio.pause();
+        updateMusicUi();
+    },
+    pauseMusicForQuiz() {
+        this.musicWasPlayingBeforeQuiz = this.musicShouldPlay;
+        this.clearAutoplayUnmuteTimers();
+        this.musicShouldPlay = false;
+        this.musicAutoStartPending = false;
+        this.musicMutedByAutoplay = false;
+        this.musicPlayRequest++;
+        this.musicAudio.muted = false;
+        this.musicAudio.pause();
+        this.startQuizMusic();
+        updateMusicUi();
+    },
+    startQuizMusic() {
+        if (!this.quizMusicAudio) return;
+        this.quizMusicAudio.volume = Math.min(this.musicVolume, 0.3);
+        this.quizMusicAudio.currentTime = 0;
+        this.quizMusicAudio.play().catch(() => { });
+    },
+    stopQuizMusic({ resumeMain = false } = {}) {
+        if (this.quizMusicAudio) {
+            this.quizMusicAudio.pause();
+            this.quizMusicAudio.currentTime = 0;
+        }
+        const shouldResume = resumeMain && this.musicWasPlayingBeforeQuiz && !this.musicPausedByUser;
+        this.musicWasPlayingBeforeQuiz = false;
+        if (shouldResume) this.playMusic({ user: false });
+        else updateMusicUi();
+    },
+    toggleMusic() {
+        if (this.musicShouldPlay && !this.musicAudio.paused) this.pauseMusic({ user: true });
+        else this.playMusic({ user: true, allowMutedFallback: true });
+    },
+    pickRandomMusicIndex() {
+        if (this.musicTracks.length <= 1) return 0;
+        let nextIndex = this.musicIndex;
+        while (nextIndex === this.musicIndex) {
+            nextIndex = Math.floor(Math.random() * this.musicTracks.length);
+        }
+        return nextIndex;
+    },
+    nextMusic({ user = true, forcePlay = false } = {}) {
+        const nextIndex = this.musicShuffle ? this.pickRandomMusicIndex() : this.musicIndex + 1;
+        this.setMusicIndex(nextIndex, { play: forcePlay || this.musicShouldPlay || user, user });
+    },
+    previousMusic() {
+        this.setMusicIndex(this.musicIndex - 1, { play: true, user: true });
+    },
+    setMusicShuffle(enabled) {
+        this.musicShuffle = Boolean(enabled);
+        updateMusicUi();
+    },
+    setMusicVolume(value) {
+        const sliderRatio = THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
+        this.musicVolume = sliderRatio * MUSIC_VOLUME_MAX;
+        this.musicAudio.volume = this.musicVolume;
+        if (this.quizMusicAudio) this.quizMusicAudio.volume = Math.min(this.musicVolume, 0.3);
+        updateMusicUi();
+    },
+    requestAutoMusic({ random = false } = {}) {
+        if (this.musicPausedByUser) {
+            updateMusicUi();
+            return;
+        }
+        if (random) this.setMusicIndex(this.pickRandomMusicIndex(), { play: false, user: false });
+        this.musicAutoStartPending = true;
+        this.clickMusicPlayButton();
+    },
+    resumePendingMusic(event) {
+        if (!this.musicAutoStartPending || this.musicPausedByUser) return;
+        const target = event?.target;
+        if (target instanceof Element && target.closest('#music-player')) return;
+        this.musicAutoStartPending = false;
+        this.musicMutedByAutoplay = false;
+        this.clearAutoplayUnmuteTimers();
+        this.musicAudio.muted = false;
+        this.playMusic({ user: false });
+    },
+    clickMusicPlayButton() {
+        window.setTimeout(() => {
+            if (this.musicPausedByUser || this.musicShouldPlay) return;
+            if (musicToggle) {
+                musicToggle.click();
+            } else {
+                this.playMusic({ user: false });
+            }
+        }, MUSIC_AUTOPLAY_CLICK_DELAY);
+    },
+    startMenuMusic() {
+        if (this.musicShouldPlay) {
+            this.playMusic({ user: false });
+            return;
+        }
+        this.requestAutoMusic({ random: true });
+    },
+    startRunMusic() {
+        if (this.musicShouldPlay) {
+            this.playMusic({ user: false });
+            return;
+        }
+        if (this.musicPausedByUser) {
+            updateMusicUi();
+            return;
+        }
+        this.requestAutoMusic({ random: true });
     },
     play(name) {
         const sound = this.sounds[name];
         if (!sound) return;
         if (this.playBuffered(name)) return;
-        if (name === 'bgm' || name === 'run') {
-            sound.currentTime = 0;
-            sound.play().catch(() => { });
-            return;
-        }
         const pool = this.soundPools[name];
         if (!pool?.length) {
             sound.currentTime = 0;
@@ -680,6 +1127,19 @@ const audioManager = {
         }, 100);
     },
 };
+
+function updateMusicUi() {
+    if (!musicTrackLabel || !musicToggle || !musicRandom || !musicVolume) return;
+    const trackTotal = audioManager.musicTracks.length;
+    musicTrackLabel.textContent = `Faixa ${audioManager.musicIndex + 1} / ${trackTotal}`;
+    const playing = audioManager.musicShouldPlay;
+    musicToggle.textContent = playing ? 'Pausar' : 'Tocar';
+    musicToggle.setAttribute('aria-label', playing ? 'Pausar música' : 'Tocar música');
+    musicRandom.setAttribute('aria-pressed', String(audioManager.musicShuffle));
+    musicVolume.value = String(Math.round((audioManager.musicVolume / MUSIC_VOLUME_MAX) * 100));
+    if (musicPlayer) musicPlayer.dataset.playing = playing ? 'true' : 'false';
+}
+
 audioManager.init();
 
 const liveObjects = [];
@@ -1011,6 +1471,7 @@ const loading = document.getElementById('loading-screen');
 if (loading) loading.remove();
 document.getElementById('start-screen').hidden = false;
 document.getElementById('start-screen').classList.add('screen-open');
+audioManager.startMenuMusic();
 
 animate();
 
@@ -1952,44 +2413,39 @@ function createSidewalkBench(side = 1) {
 
 function createGrassPlant() {
     const group = new THREE.Group();
-    const stemMat = new THREE.MeshStandardMaterial({ color: 0x235f32, flatShading: true, roughness: 0.9 });
-    const inkMat = new THREE.MeshStandardMaterial({ color: 0x102418, flatShading: true, roughness: 0.88 });
-    const soilMat = new THREE.MeshStandardMaterial({ color: 0x256339, flatShading: true, roughness: 0.92 });
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x2f7a38, flatShading: true, roughness: 0.94 });
+    const soilMat = new THREE.MeshStandardMaterial({ color: 0x5fa642, flatShading: true, roughness: 0.96 });
     const leafMats = [
-        new THREE.MeshStandardMaterial({ color: 0x2f9f48, flatShading: true, roughness: 0.86 }),
-        new THREE.MeshStandardMaterial({ color: 0x66bd4a, flatShading: true, roughness: 0.86 }),
-        new THREE.MeshStandardMaterial({ color: 0x1f7d43, flatShading: true, roughness: 0.86 }),
+        new THREE.MeshStandardMaterial({ color: 0x3d9b3f, flatShading: true, roughness: 0.9 }),
+        new THREE.MeshStandardMaterial({ color: 0x75bd4a, flatShading: true, roughness: 0.9 }),
+        new THREE.MeshStandardMaterial({ color: 0x2b7f3d, flatShading: true, roughness: 0.9 }),
     ];
-    const flowerMats = {
-        sunflower: new THREE.MeshStandardMaterial({ color: 0xffcf3a, flatShading: true, roughness: 0.66 }),
-        sunflowerWarm: new THREE.MeshStandardMaterial({ color: 0xff9f1c, flatShading: true, roughness: 0.7 }),
-        sunflowerCenter: new THREE.MeshStandardMaterial({ color: 0x5b3518, flatShading: true, roughness: 0.84 }),
-        violet: new THREE.MeshStandardMaterial({ color: 0x7454d8, flatShading: true, roughness: 0.7 }),
-        violetDeep: new THREE.MeshStandardMaterial({ color: 0x4a2f9d, flatShading: true, roughness: 0.74 }),
-        rose: new THREE.MeshStandardMaterial({ color: 0xe84c67, flatShading: true, roughness: 0.7 }),
-        roseDeep: new THREE.MeshStandardMaterial({ color: 0xa91f42, flatShading: true, roughness: 0.78 }),
-        daisy: new THREE.MeshStandardMaterial({ color: 0xfff2c4, flatShading: true, roughness: 0.7 }),
-        blue: new THREE.MeshStandardMaterial({ color: 0x4aa3ff, flatShading: true, roughness: 0.72 }),
-        center: new THREE.MeshStandardMaterial({ color: 0xffde59, flatShading: true, roughness: 0.76 }),
-    };
-    const petalGeo = new THREE.DodecahedronGeometry(0.1, 0);
-    const centerGeo = new THREE.DodecahedronGeometry(0.13, 0);
+    const flowerMats = [
+        new THREE.MeshStandardMaterial({ color: 0xf5e9b8, flatShading: true, roughness: 0.82 }),
+        new THREE.MeshStandardMaterial({ color: 0xf0cf62, flatShading: true, roughness: 0.82 }),
+        new THREE.MeshStandardMaterial({ color: 0xaec9ff, flatShading: true, roughness: 0.84 }),
+        new THREE.MeshStandardMaterial({ color: 0xc9a8dd, flatShading: true, roughness: 0.84 }),
+    ];
+    const flowerCenterMat = new THREE.MeshStandardMaterial({ color: 0x8a6a24, flatShading: true, roughness: 0.88 });
+    const leafGeo = new THREE.DodecahedronGeometry(0.12, 0);
+    const petalGeo = new THREE.DodecahedronGeometry(0.045, 0);
+    const centerGeo = new THREE.DodecahedronGeometry(0.04, 0);
 
-    const base = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 0), soilMat);
-    base.scale.set(2.6, 0.22, 1.45);
-    base.position.y = 0.07;
+    const base = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), soilMat);
+    base.scale.set(2.15, 0.12, 1.2);
+    base.position.y = 0.045;
     base.castShadow = true;
     base.receiveShadow = true;
     group.add(base);
 
-    const leafCount = 10 + Math.floor(Math.random() * 5);
+    const leafCount = 14 + Math.floor(Math.random() * 7);
     for (let i = 0; i < leafCount; i++) {
-        const angle = (i / leafCount) * Math.PI * 2 + Math.random() * 0.28;
-        const radius = 0.18 + Math.random() * 0.46;
-        const leaf = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2, 0), leafMats[i % leafMats.length]);
-        leaf.position.set(Math.cos(angle) * radius, 0.18 + Math.random() * 0.18, Math.sin(angle) * radius * 0.62);
-        leaf.scale.set(0.58, 1.12 + Math.random() * 0.48, 0.34);
-        leaf.rotation.set(0.78 + Math.random() * 0.26, angle, (Math.random() - 0.5) * 0.26);
+        const angle = (i / leafCount) * Math.PI * 2 + Math.random() * 0.34;
+        const radius = 0.14 + Math.random() * 0.44;
+        const leaf = new THREE.Mesh(leafGeo, leafMats[i % leafMats.length]);
+        leaf.position.set(Math.cos(angle) * radius, 0.13 + Math.random() * 0.2, Math.sin(angle) * radius * 0.62);
+        leaf.scale.set(0.36, 1.18 + Math.random() * 0.68, 0.22);
+        leaf.rotation.set(0.9 + Math.random() * 0.3, angle, (Math.random() - 0.5) * 0.36);
         leaf.castShadow = true;
         leaf.receiveShadow = true;
         group.add(leaf);
@@ -2003,86 +2459,69 @@ function createGrassPlant() {
         return end;
     };
 
-    const addPetalHead = (position, petalMat, centerMat, petalCount, radius, petalScale, centerScale = 1) => {
+    const addPetalHead = (position, petalMat, petalCount = 5) => {
         const head = new THREE.Group();
         head.position.copy(position);
-        head.rotation.y = (Math.random() - 0.5) * 0.22;
+        head.rotation.set((Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 0.28, (Math.random() - 0.5) * 0.12);
 
         for (let i = 0; i < petalCount; i++) {
             const angle = (i / petalCount) * Math.PI * 2;
-            const outline = new THREE.Mesh(petalGeo, inkMat);
-            outline.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, -0.018);
-            outline.scale.set(petalScale.x * 1.24, petalScale.y * 1.24, petalScale.z);
-            outline.rotation.z = angle;
-            outline.castShadow = true;
-            head.add(outline);
-
-            const petal = new THREE.Mesh(petalGeo, i % 2 === 0 ? petalMat : petalMat.clone());
-            if (i % 2 !== 0) petal.material.color.offsetHSL(0, -0.04, -0.06);
-            petal.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0.02);
-            petal.scale.copy(petalScale);
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            petal.position.set(Math.cos(angle) * 0.07, Math.sin(angle) * 0.07, 0.012);
+            petal.scale.set(0.82, 1.16, 0.42);
             petal.rotation.z = angle;
             petal.castShadow = true;
             head.add(petal);
         }
 
-        const centerOutline = new THREE.Mesh(centerGeo, inkMat);
-        centerOutline.scale.setScalar(centerScale * 1.25);
-        centerOutline.position.z = 0.005;
-        centerOutline.castShadow = true;
-        head.add(centerOutline);
-
-        const center = new THREE.Mesh(centerGeo, centerMat);
-        center.scale.setScalar(centerScale);
-        center.position.z = 0.045;
+        const center = new THREE.Mesh(centerGeo, flowerCenterMat);
+        center.position.z = 0.03;
         center.castShadow = true;
         head.add(center);
 
+        head.scale.setScalar(0.76 + Math.random() * 0.2);
         group.add(head);
         return head;
     };
 
-    const sunflowerTop = addStem(-0.2, -0.02, 1.52 + Math.random() * 0.2, -0.04, 0.02, 0.036);
-    addPetalHead(sunflowerTop, flowerMats.sunflower, flowerMats.sunflowerCenter, 12, 0.24, new THREE.Vector3(1.0, 1.5, 0.38), 1.02);
-
-    const roseTop = addStem(0.42, 0.1, 1.02 + Math.random() * 0.14, 0.04, -0.01, 0.028);
-    const roseOutline = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25, 0), inkMat);
-    roseOutline.position.copy(roseTop);
-    roseOutline.scale.set(1.0, 1.14, 0.9);
-    roseOutline.castShadow = true;
-    group.add(roseOutline);
-
-    const roseBud = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22, 0), flowerMats.rose);
-    roseBud.position.set(roseTop.x, roseTop.y + 0.015, roseTop.z + 0.025);
-    roseBud.scale.set(0.88, 1.08, 0.84);
-    roseBud.castShadow = true;
-    group.add(roseBud);
-    for (const offset of [-0.11, 0.11]) {
-        const petal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), flowerMats.roseDeep);
-        petal.position.set(roseTop.x + offset, roseTop.y - 0.005, roseTop.z + 0.052);
-        petal.scale.set(0.72, 0.98, 0.5);
-        petal.rotation.z = offset < 0 ? -0.36 : 0.36;
-        petal.castShadow = true;
-        group.add(petal);
-    }
-
-    const violetPositions = [
-        [-0.64, 0.22, 0.72],
-        [0.05, 0.36, 0.84],
-        [0.68, -0.2, 0.66],
+    const flowerPositions = [
+        [-0.42, -0.04, 0.72],
+        [0.02, 0.18, 0.9],
+        [0.44, -0.12, 0.66],
+        [-0.08, -0.34, 0.54],
     ];
-    for (const [x, z, h] of violetPositions) {
-        const top = addStem(x, z, h + Math.random() * 0.1, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04);
-        const petalMat = Math.random() > 0.42 ? flowerMats.violet : flowerMats.blue;
-        addPetalHead(top, petalMat, flowerMats.center, 5, 0.13, new THREE.Vector3(0.72, 1.0, 0.34), 0.56);
+    const visibleFlowers = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < visibleFlowers; i++) {
+        const [x, z, h] = flowerPositions[i];
+        const top = addStem(
+            x + (Math.random() - 0.5) * 0.08,
+            z + (Math.random() - 0.5) * 0.08,
+            h + Math.random() * 0.12,
+            (Math.random() - 0.5) * 0.08,
+            (Math.random() - 0.5) * 0.08,
+            0.012 + Math.random() * 0.006
+        );
+        addPetalHead(top, flowerMats[(i + Math.floor(Math.random() * flowerMats.length)) % flowerMats.length], 4 + Math.floor(Math.random() * 2));
     }
 
-    if (Math.random() > 0.35) {
-        const daisyTop = addStem(-0.05, -0.42, 0.86 + Math.random() * 0.12, 0.02, -0.02);
-        addPetalHead(daisyTop, flowerMats.daisy, flowerMats.center, 7, 0.14, new THREE.Vector3(0.58, 1.08, 0.32), 0.5);
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const top = addStem(
+            Math.cos(angle) * (0.1 + Math.random() * 0.34),
+            Math.sin(angle) * (0.08 + Math.random() * 0.28),
+            0.36 + Math.random() * 0.32,
+            (Math.random() - 0.5) * 0.08,
+            (Math.random() - 0.5) * 0.08,
+            0.009 + Math.random() * 0.005
+        );
+        const seed = new THREE.Mesh(new THREE.DodecahedronGeometry(0.036, 0), leafMats[i % leafMats.length]);
+        seed.position.copy(top);
+        seed.scale.set(0.7, 1.1, 0.55);
+        seed.castShadow = true;
+        group.add(seed);
     }
 
-    group.scale.setScalar(1.06 + Math.random() * 0.26);
+    group.scale.setScalar(0.82 + Math.random() * 0.18);
     return group;
 }
 
@@ -2425,7 +2864,7 @@ function createInstitute() {
     for (const x of [31.05, 33.35]) addTrimBox(0.13, 23.0, 0.1, x, 13.1, towerFront + 0.04, timberLightMat);
     for (const y of [1.2, 6.8, 12.6, 18.4, 24.1]) addTrimBox(5.2, 0.2, 0.12, 32.2, y, towerFront + 0.045, timberMat);
     for (const y of [4.0, 9.9, 15.7, 21.5]) addTrimBox(4.7, 0.11, 0.09, 32.2, y, towerFront + 0.05, timberLightMat);
-    // X-pattern diagonals matching foto1/foto2 tower
+    // X-pattern diagonals matching the campus tower shape.
     for (const [yB, yT] of [[6.8,12.6],[12.6,18.4],[18.4,24.1]]) {
         const rise=yT-yB, run=2.2, dl=Math.hypot(run,rise), da=Math.atan2(rise,run), cy=(yB+yT)/2;
         const d1=addTrimBox(dl,0.13,0.1,32.2,cy,towerFront+0.055,timberMat); d1.rotation.z=da;
@@ -3569,18 +4008,345 @@ function createObstacle(type, lane, z) {
     };
 
     if (type.id === 'trafficCones') {
-        addCone(-0.68, -0.12, 1.08);
-        addCone(0.0, 0.22, 0.96);
-        addCone(0.68, -0.12, 1.08);
-    } else if (type.id === 'lowBarrier') {
-        [-0.86, 0.86].forEach(x => {
-            addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.05, 0.18), black), x, 0.52, 0);
+        const routerEdge = new THREE.MeshStandardMaterial({ color: 0x050705, roughness: 0.76, metalness: 0.02 });
+        const routerBody = new THREE.MeshStandardMaterial({ color: 0x252a27, roughness: 0.62, metalness: 0.04 });
+        const routerFace = new THREE.MeshStandardMaterial({ color: 0x131714, roughness: 0.72, metalness: 0.02 });
+        const routerTop = new THREE.MeshStandardMaterial({
+            color: 0x313b34,
+            emissive: 0x063a15,
+            emissiveIntensity: 0.14,
+            roughness: 0.54,
+            metalness: 0.03,
         });
-        const plank = addMesh(new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.42, 0.22), mats.warningYellow.clone()), 0, 0.76, 0);
-        for (let i = 0; i < 5; i++) {
-            addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.48, 0.24), black), -0.78 + i * 0.39, 0.76, 0.02, 0.55);
+        const routerGreen = new THREE.MeshStandardMaterial({
+            color: 0x13c743,
+            emissive: 0x05b735,
+            emissiveIntensity: 0.38,
+            roughness: 0.42,
+            metalness: 0.01,
+        });
+        const routerSignal = new THREE.MeshBasicMaterial({
+            color: 0x17e84f,
+            transparent: true,
+            opacity: 0.86,
+            depthWrite: false,
+        });
+        const routerSignalDark = new THREE.MeshBasicMaterial({
+            color: 0x050705,
+            transparent: true,
+            opacity: 0.72,
+            depthWrite: false,
+        });
+        const cableMat = new THREE.MeshBasicMaterial({ color: 0x050705 });
+        const routerSignals = [];
+        const routerBits = [];
+        const routerLeds = [];
+        const routerBodies = [];
+
+        const addRouterMesh = (mesh, x, y, zPos, rotZ = 0) => {
+            mesh.position.set(x, y, zPos);
+            mesh.rotation.z = rotZ;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+            return mesh;
+        };
+
+        const makeTube = (points, material, radius = 0.028, segments = 32) => {
+            const curve = new THREE.CatmullRomCurve3(points.map(point => new THREE.Vector3(point[0], point[1], point[2])));
+            const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, segments, radius, 7, false), material.clone());
+            mesh.castShadow = false;
+            mesh.receiveShadow = false;
+            mesh.renderOrder = 7;
+            group.add(mesh);
+            return mesh;
+        };
+
+        const addSignalStroke = (points, radius = 0.03, phase = 0) => {
+            const outlinePoints = points.map(point => [point[0], point[1] - 0.01, point[2] - 0.012]);
+            const outline = makeTube(outlinePoints, routerSignalDark, radius + 0.018, 36);
+            const core = makeTube(points, routerSignal, radius, 36);
+            routerSignals.push({
+                outline,
+                core,
+                phase,
+                baseScale: core.scale.clone(),
+                baseCorePosition: core.position.clone(),
+                baseOutlinePosition: outline.position.clone(),
+            });
+            return core;
+        };
+
+        const addLed = (x, y, zPos, color, phase) => {
+            const led = addRouterMesh(
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(0.035, 10, 8),
+                    new THREE.MeshStandardMaterial({
+                        color,
+                        emissive: color,
+                        emissiveIntensity: 0.6,
+                        roughness: 0.3,
+                    })
+                ),
+                x,
+                y,
+                zPos
+            );
+            routerLeds.push({ mesh: led, phase });
+            return led;
+        };
+
+        const makeRouterEye = side => {
+            const shape = new THREE.Shape();
+            if (side < 0) {
+                shape.moveTo(-0.11, 0.05);
+                shape.lineTo(0.12, 0.02);
+                shape.lineTo(-0.04, -0.09);
+            } else {
+                shape.moveTo(0.11, 0.05);
+                shape.lineTo(-0.12, 0.02);
+                shape.lineTo(0.04, -0.09);
+            }
+            shape.closePath();
+            return shape;
+        };
+
+        const addRouter = (x, zPos, scale = 1, phase = 0, yaw = 0) => {
+            const routerGroup = new THREE.Group();
+            routerGroup.position.set(x, 0, zPos);
+            routerGroup.scale.setScalar(scale);
+            routerGroup.rotation.y = yaw;
+            group.add(routerGroup);
+            routerBodies.push({ group: routerGroup, phase, baseYaw: yaw });
+
+            const localAdd = (mesh, px, py, pz, rz = 0) => {
+                mesh.position.set(px, py, pz);
+                mesh.rotation.z = rz;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                routerGroup.add(mesh);
+                return mesh;
+            };
+
+            const blob = new THREE.Mesh(
+                new THREE.CircleGeometry(0.62, 24),
+                new THREE.MeshBasicMaterial({ color: 0x050705, transparent: true, opacity: 0.34, depthWrite: false })
+            );
+            blob.position.set(0, 0.035, 0.05);
+            blob.rotation.x = -Math.PI / 2;
+            blob.scale.set(1.28, 0.52, 1);
+            routerGroup.add(blob);
+
+            localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.34, 0.55), routerEdge), 0, 0.37, 0.02);
+            localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.24, 0.46), routerBody), 0, 0.4, 0.05);
+            const topPlate = localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.06, 0.46), routerTop), 0, 0.55, 0.04);
+            topPlate.rotation.x = -0.08;
+            localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.15, 0.055), routerFace), 0, 0.35, 0.335);
+
+            [-1, 1].forEach(side => {
+                const eyeOutline = localAdd(new THREE.Mesh(new THREE.ShapeGeometry(makeRouterEye(side)), routerEdge), side * 0.21, 0.375, 0.392);
+                eyeOutline.scale.setScalar(1.16);
+                eyeOutline.castShadow = false;
+                eyeOutline.receiveShadow = false;
+                const eyeCore = localAdd(new THREE.Mesh(new THREE.ShapeGeometry(makeRouterEye(side)), routerGreen), side * 0.21, 0.375, 0.402);
+                eyeCore.scale.setScalar(0.72);
+                eyeCore.castShadow = false;
+                eyeCore.receiveShadow = false;
+            });
+            addLed(x - 0.07 * scale, 0.31 * scale, zPos + 0.39 * scale, 0xd83c32, phase + 0.1);
+            addLed(x + 0.02 * scale, 0.31 * scale, zPos + 0.39 * scale, 0xd83c32, phase + 0.55);
+            addLed(x + 0.12 * scale, 0.31 * scale, zPos + 0.39 * scale, 0x18d72f, phase + 1.0);
+
+            [-1, 1].forEach(side => {
+                const antennaOutline = localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.76, 10), routerEdge), side * 0.29, 0.9, -0.18);
+                antennaOutline.rotation.z = side * -0.42;
+                antennaOutline.rotation.x = 0.18;
+                const antennaCore = localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.7, 8), routerGreen), side * 0.29, 0.9, -0.155);
+                antennaCore.rotation.copy(antennaOutline.rotation);
+                const cap = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), routerEdge), side * 0.45, 1.24, -0.28);
+                cap.scale.set(0.8, 1.1, 0.8);
+
+                const arm = localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 8), routerEdge), side * 0.48, 0.5, 0.17);
+                arm.rotation.z = side * 0.86;
+                localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 8), white), side * 0.68, 0.6, 0.2);
+            });
+
+            [-1, 1].forEach(side => {
+                const leg = localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.32, 8), routerEdge), side * 0.24, 0.17, 0.12);
+                leg.rotation.z = side * -0.16;
+                const foot = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 7), routerEdge), side * 0.29, 0.06, 0.17);
+                foot.scale.set(1.45, 0.52, 1.0);
+            });
+
+            const cableStart = x + (phase % 2 ? 0.34 : -0.34) * scale;
+            const cableEnd = x + (phase % 2 ? 0.82 : -0.82) * scale;
+            makeTube([
+                [cableStart, 0.14 * scale, zPos + 0.28 * scale],
+                [x + (phase % 2 ? 0.52 : -0.52) * scale, 0.04, zPos + 0.56 * scale],
+                [cableEnd, 0.035, zPos + 0.82 * scale],
+            ], cableMat, 0.014, 18);
+            addRouterMesh(new THREE.Mesh(new THREE.SphereGeometry(0.06 * scale, 8, 6), routerEdge), cableEnd, 0.035, zPos + 0.82 * scale);
+
+            addSignalStroke([
+                [x - 0.25 * scale, 1.08 * scale, zPos + 0.02],
+                [x - 0.12 * scale, 1.17 * scale, zPos + 0.02],
+                [x, 1.09 * scale, zPos + 0.02],
+                [x + 0.12 * scale, 1.17 * scale, zPos + 0.02],
+                [x + 0.25 * scale, 1.08 * scale, zPos + 0.02],
+            ], 0.025 * scale, phase);
+            addSignalStroke([
+                [x - 0.34 * scale, 1.22 * scale, zPos],
+                [x - 0.17 * scale, 1.34 * scale, zPos],
+                [x, 1.22 * scale, zPos],
+                [x + 0.17 * scale, 1.34 * scale, zPos],
+                [x + 0.34 * scale, 1.22 * scale, zPos],
+            ], 0.022 * scale, phase + 0.7);
+        };
+
+        addRouter(-1.15, -0.12, 0.88, 0, 0.16);
+        addRouter(0, 0.14, 0.98, 1.2, 0);
+        addRouter(1.15, -0.12, 0.88, 2.4, -0.16);
+
+        addSignalStroke([
+            [-1.48, 1.42, 0.02],
+            [-1.16, 1.56, 0.02],
+            [-0.84, 1.43, 0.02],
+            [-0.5, 1.58, 0.02],
+            [-0.14, 1.45, 0.02],
+            [0.18, 1.58, 0.02],
+            [0.52, 1.44, 0.02],
+            [0.88, 1.56, 0.02],
+            [1.5, 1.44, 0.02],
+        ], 0.03, 3.4);
+
+        const bitGeo = new THREE.BoxGeometry(0.08, 0.08, 0.035);
+        for (let i = 0; i < 16; i++) {
+            const bit = addRouterMesh(
+                new THREE.Mesh(bitGeo, i % 4 === 0 ? routerSignalDark.clone() : routerSignal.clone()),
+                -1.46 + Math.random() * 2.92,
+                1.24 + Math.random() * 0.5,
+                -0.08 + Math.random() * 0.24,
+                (Math.random() - 0.5) * 1.4
+            );
+            bit.scale.set(0.58 + Math.random() * 1.0, 0.48 + Math.random() * 0.8, 1);
+            bit.castShadow = false;
+            bit.receiveShadow = false;
+            routerBits.push({
+                mesh: bit,
+                basePosition: bit.position.clone(),
+                phase: Math.random() * Math.PI * 2,
+            });
         }
-        plank.userData.kind = 'jump';
+
+        group.userData.networkRouters = {
+            signals: routerSignals,
+            bits: routerBits,
+            leds: routerLeds,
+            bodies: routerBodies,
+        };
+    } else if (type.id === 'lowBarrier') {
+        const cableDark = new THREE.MeshStandardMaterial({ color: 0x080b0a, roughness: 0.68, metalness: 0.04 });
+        const cableGreen = new THREE.MeshStandardMaterial({
+            color: 0x13983a,
+            emissive: 0x0fd34d,
+            emissiveIntensity: 0.36,
+            roughness: 0.38,
+            metalness: 0.01,
+        });
+        const cableGlow = new THREE.MeshBasicMaterial({
+            color: 0x20f45b,
+            transparent: true,
+            opacity: 0.46,
+            depthWrite: false,
+        });
+        const boxDark = new THREE.MeshStandardMaterial({ color: 0x1b2220, roughness: 0.7, metalness: 0.04 });
+        const boxFace = new THREE.MeshStandardMaterial({ color: 0x2f3f36, roughness: 0.58, metalness: 0.04 });
+        const ledRed = new THREE.MeshStandardMaterial({
+            color: 0xb71919,
+            emissive: 0xff2020,
+            emissiveIntensity: 0.4,
+            roughness: 0.42,
+        });
+        const rig = { pulses: [], sparks: [], glows: [], leds: [] };
+
+        const makeTube = (points, material, radius = 0.04, segments = 42) => {
+            const curve = new THREE.CatmullRomCurve3(points.map(point => new THREE.Vector3(point[0], point[1], point[2])));
+            const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, segments, radius, 8, false), material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+            return mesh;
+        };
+
+        const terminalXs = [-5.55, 5.55];
+        terminalXs.forEach((x, sideIndex) => {
+            addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.16, 0.86), cableDark), x, 0.08, 0);
+            addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 4.08, 10), cableDark), x, 2.04, 0);
+            const terminal = addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.16, 0.64), boxDark), x, 2.66, 0);
+            terminal.rotation.y = sideIndex === 0 ? -0.1 : 0.1;
+            addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.64, 0.04), boxFace), x, 2.78, -0.35);
+            for (let i = 0; i < 3; i++) {
+                const led = addMesh(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), i === 1 ? cableGreen.clone() : ledRed.clone()), x - 0.16 + i * 0.16, 2.2, -0.36);
+                rig.leds.push({ mesh: led, phase: sideIndex * 1.7 + i * 0.45 });
+            }
+        });
+
+        const cableRows = [
+            { y: 2.05, z: -0.24, wave: 0.09 },
+            { y: 2.58, z: 0.14, wave: -0.08 },
+            { y: 3.1, z: -0.04, wave: 0.09 },
+            { y: 3.62, z: 0.24, wave: -0.07 },
+            { y: 4.02, z: -0.16, wave: 0.05 },
+        ];
+        const pulseGeo = new THREE.BoxGeometry(0.3, 0.12, 0.08);
+        const sparkGeo = new THREE.BoxGeometry(0.1, 0.1, 0.05);
+
+        cableRows.forEach((row, rowIndex) => {
+            const points = [
+                [-5.5, row.y, row.z],
+                [-2.7, row.y + row.wave, row.z + 0.04],
+                [0, row.y - row.wave * 0.72, row.z - 0.03],
+                [2.7, row.y + row.wave * 0.86, row.z + 0.05],
+                [5.5, row.y, row.z],
+            ];
+            makeTube(points, cableDark.clone(), 0.078, 50);
+            const glow = makeTube(points, cableGlow.clone(), 0.032, 50);
+            glow.castShadow = false;
+            glow.receiveShadow = false;
+            rig.glows.push({ mesh: glow, phase: rowIndex * 0.75 });
+
+            for (let i = 0; i < 4; i++) {
+                const mat = cableGreen.clone();
+                const pulse = addMesh(new THREE.Mesh(pulseGeo, mat), -4.8 + i * 2.75, row.y, row.z + 0.09);
+                pulse.castShadow = false;
+                pulse.receiveShadow = false;
+                rig.pulses.push({
+                    mesh: pulse,
+                    startX: rowIndex % 2 === 0 ? -5.25 : 5.25,
+                    endX: rowIndex % 2 === 0 ? 5.25 : -5.25,
+                    y: row.y,
+                    z: row.z + 0.09,
+                    phase: (i / 4) + rowIndex * 0.12,
+                    speed: 0.55 + rowIndex * 0.04,
+                });
+            }
+        });
+
+        for (let i = 0; i < 36; i++) {
+            const mat = i % 3 === 0 ? cableDark.clone() : cableGreen.clone();
+            if (mat.emissive) mat.emissiveIntensity = 0.18 + Math.random() * 0.28;
+            const spark = addMesh(new THREE.Mesh(sparkGeo, mat), -5.0 + Math.random() * 10.0, 1.88 + Math.random() * 2.25, -0.38 + Math.random() * 0.76);
+            spark.scale.set(0.6 + Math.random() * 1.1, 0.48 + Math.random() * 0.9, 1);
+            spark.castShadow = false;
+            spark.receiveShadow = false;
+            rig.sparks.push({
+                mesh: spark,
+                basePosition: spark.position.clone(),
+                phase: Math.random() * Math.PI * 2,
+            });
+        }
+
+        group.userData.lowBarrierNetwork = rig;
     } else if (type.id === 'crateStack') {
         const crtCase = new THREE.MeshStandardMaterial({ color: 0xd7c7ad, roughness: 0.64, metalness: 0.01 });
         const crtCaseDark = new THREE.MeshStandardMaterial({ color: 0xa99473, roughness: 0.72, metalness: 0.01 });
@@ -3591,6 +4357,9 @@ function createObstacle(type, lane, z) {
             metalness: 0.01,
             emissive: 0x123d1d,
             emissiveIntensity: 0.18,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
         });
         const chairCushion = new THREE.MeshStandardMaterial({ color: 0x111315, roughness: 0.78, metalness: 0.02 });
         const chairFrame = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.55, metalness: 0.18 });
@@ -3628,34 +4397,48 @@ function createObstacle(type, lane, z) {
         lever.rotation.x = 0.24;
         addMesh(new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), chairRubber), -1.03, 0.5, 0.5);
 
-        const monitorLift = 0.78;
-        const back = addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.66, 1.18, 0.9), crtCaseDark), 0, 1.05 + monitorLift, -0.16);
-        back.scale.z = 1.08;
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.92, 1.34, 0.28), crtCase), 0, 1.12 + monitorLift, 0.32);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.68, 1.1, 0.09), crtTrim), 0, 1.14 + monitorLift, 0.5);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.78, 0.06), black), 0, 1.18 + monitorLift, 0.56);
+        const monitorLift = 0.82;
+        const monitorScale = 1.14;
+        const monitorParts = [];
+        const addMonitorPart = (mesh, x, y, zPos, rotZ = 0) => {
+            const part = addMesh(mesh, x, y, zPos, rotZ);
+            monitorParts.push(part);
+            return part;
+        };
 
-        const screen = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(1.14, 0.7), crtScreen), 0, 1.18 + monitorLift, 0.595);
+        const back = addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.66, 1.18, 0.9), crtCaseDark), 0, 1.05 + monitorLift, -0.16);
+        back.scale.z = 1.08;
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.92, 1.34, 0.28), crtCase), 0, 1.12 + monitorLift, 0.32);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.68, 1.1, 0.09), crtTrim), 0, 1.14 + monitorLift, 0.5);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.78, 0.06), black), 0, 1.18 + monitorLift, 0.56);
+
+        const screen = addMonitorPart(new THREE.Mesh(new THREE.PlaneGeometry(1.14, 0.7), crtScreen), 0, 1.18 + monitorLift, 0.65);
         screen.receiveShadow = false;
         screen.castShadow = false;
+        screen.renderOrder = 6;
 
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.16, 0.34), crtTrim), 0, 1.86 + monitorLift, 0.5);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.18, 0.34), crtCaseDark), 0, 0.43 + monitorLift, 0.48);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.16, 0.34), crtTrim), -0.86, 1.15 + monitorLift, 0.5);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.16, 0.34), crtTrim), 0.86, 1.15 + monitorLift, 0.5);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.16, 0.34), crtTrim), 0, 1.86 + monitorLift, 0.5);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.18, 0.34), crtCaseDark), 0, 0.43 + monitorLift, 0.48);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.16, 0.34), crtTrim), -0.86, 1.15 + monitorLift, 0.5);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.16, 0.34), crtTrim), 0.86, 1.15 + monitorLift, 0.5);
 
-        const button = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.055, 18), crtTrim), 0.62, 0.66 + monitorLift, 0.64);
+        const button = addMonitorPart(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.055, 18), crtTrim), 0.62, 0.66 + monitorLift, 0.64);
         button.rotation.x = Math.PI / 2;
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.04, 0.055), black), -0.54, 0.66 + monitorLift, 0.64);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.055), black), -0.54, 0.76 + monitorLift, 0.64);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.04, 0.055), black), -0.54, 0.66 + monitorLift, 0.64);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.055), black), -0.54, 0.76 + monitorLift, 0.64);
 
         [-0.88, 0.88].forEach(side => {
             for (let i = 0; i < 4; i++) {
-                addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.34), black), side, 0.86 + i * 0.12 + monitorLift, -0.08);
+                addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.34), black), side, 0.86 + i * 0.12 + monitorLift, -0.08);
             }
         });
-        addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.18, 24), crtCaseDark), 0, 0.24 + monitorLift, -0.02);
-        addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.14, 0.72), crtCaseDark), 0, 0.08 + monitorLift, 0);
+        addMonitorPart(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.18, 24), crtCaseDark), 0, 0.24 + monitorLift, -0.02);
+        addMonitorPart(new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.14, 0.72), crtCaseDark), 0, 0.08 + monitorLift, 0);
+        monitorParts.forEach(part => {
+            part.scale.x *= monitorScale;
+            part.scale.y *= monitorScale;
+            part.scale.z *= monitorScale;
+        });
         group.scale.set(0.82, 0.72, 0.82);
     } else if (type.id === 'roadBlock') {
         const virusGreen = new THREE.MeshStandardMaterial({
@@ -3741,8 +4524,8 @@ function createObstacle(type, lane, z) {
         addFacePixel(0, 1.05, 4.0, 0.82);
 
         const trailRimGeo = new THREE.BoxGeometry(0.42, 0.046, 0.28);
-        const trailCoreGeo = new THREE.BoxGeometry(0.3, 0.068, 0.2);
-        const trailSparkGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
+        const trailCoreGeo = new THREE.BoxGeometry(0.3, 0.032, 0.2);
+        const trailSparkGeo = new THREE.BoxGeometry(0.13, 0.03, 0.13);
         for (let i = 0; i < 96; i++) {
             const rim = new THREE.Mesh(
                 trailRimGeo,
@@ -3750,7 +4533,7 @@ function createObstacle(type, lane, z) {
                     color: 0x020402,
                     transparent: true,
                     depthWrite: false,
-                    depthTest: false,
+                    depthTest: true,
                     opacity: 0,
                 })
             );
@@ -3760,7 +4543,7 @@ function createObstacle(type, lane, z) {
                     color: i % 4 === 0 ? 0x18c73b : 0x049d1c,
                     transparent: true,
                     depthWrite: false,
-                    depthTest: false,
+                    depthTest: true,
                     opacity: 0,
                 })
             );
@@ -3770,16 +4553,16 @@ function createObstacle(type, lane, z) {
                     color: 0x39f060,
                     transparent: true,
                     depthWrite: false,
-                    depthTest: false,
+                    depthTest: true,
                     opacity: 0,
                 })
             );
             rim.visible = false;
             core.visible = false;
             spark.visible = false;
-            rim.renderOrder = 8 + i * 3;
-            core.renderOrder = 9 + i * 3;
-            spark.renderOrder = 10 + i * 3;
+            rim.renderOrder = -3;
+            core.renderOrder = -2;
+            spark.renderOrder = -1;
             group.add(rim);
             group.add(core);
             group.add(spark);
@@ -3953,21 +4736,272 @@ function createObstacle(type, lane, z) {
             portalMat,
             portalBars,
             summonZ,
+            predictedLane: lane,
             launched: false,
             elapsed: 0,
         };
     } else if (type.id === 'overheadSign') {
-        [-1.08, 1.08].forEach(x => {
-            addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.36, 14), black), x, 1.18, 0);
+        const droneWhite = new THREE.MeshStandardMaterial({ color: 0xf5f5ee, roughness: 0.54, metalness: 0.03 });
+        const droneInk = new THREE.MeshStandardMaterial({ color: 0x07090c, roughness: 0.58, metalness: 0.12 });
+        const droneDark = new THREE.MeshStandardMaterial({ color: 0x1d2228, roughness: 0.62, metalness: 0.08 });
+        const droneGlass = new THREE.MeshStandardMaterial({
+            color: 0x101820,
+            emissive: 0x071d2d,
+            emissiveIntensity: 0.2,
+            roughness: 0.34,
+            metalness: 0.04,
         });
-        const sign = addMesh(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.5, 0.3), blue), 0, 2.22, 0);
-        const underside = addMesh(new THREE.Mesh(new THREE.BoxGeometry(2.65, 0.12, 0.36), yellow), 0, 1.9, 0.02);
-        for (let i = 0; i < 5; i++) {
-            addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.58, 0.34), white), -0.78 + i * 0.39, 2.22, 0.17, 0.55);
-        }
-        sign.userData.kind = 'slide';
-        underside.userData.kind = 'slide';
+        const droneBlue = new THREE.MeshStandardMaterial({
+            color: 0x2b9cff,
+            emissive: 0x0b4d7a,
+            emissiveIntensity: 0.28,
+            roughness: 0.38,
+            metalness: 0.02,
+        });
+        const droneSwarm = { drones: [], rotors: [] };
+        const droneLift = 1.78;
+        const rotorBladeGeo = new THREE.BoxGeometry(1.14, 0.038, 0.14);
+        const rotorHubGeo = new THREE.CylinderGeometry(0.07, 0.08, 0.06, 12);
+
+        const addDrone = (x, zPos, scale = 1, phase = 0) => {
+            const drone = new THREE.Group();
+            drone.position.set(x, 0, zPos);
+            drone.scale.setScalar(scale);
+            drone.userData.kind = 'slide';
+            group.add(drone);
+            droneSwarm.drones.push({ group: drone, phase, baseZ: zPos });
+
+            const localAdd = (mesh, px, py, pz, rz = 0) => {
+                mesh.position.set(px, py + droneLift, pz);
+                mesh.rotation.z = rz;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.userData.kind = 'slide';
+                drone.add(mesh);
+                return mesh;
+            };
+
+            const bodyShadow = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 12), droneInk), 0, 2.18, 0);
+            bodyShadow.scale.set(1.08, 0.82, 0.82);
+            const body = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 14), droneWhite), 0, 2.24, 0.02);
+            body.scale.set(0.88, 1.28, 0.76);
+            const belly = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), droneGlass), 0, 1.62, 0.26);
+            belly.scale.set(1.18, 1.08, 0.78);
+            localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.22, 12), droneBlue), 0, 1.44, 0.28).rotation.x = Math.PI / 2;
+            const lowerSensor = localAdd(new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), droneInk), 0, 1.28, 0.12);
+            lowerSensor.scale.set(0.9, 1.28, 0.9);
+
+            const armConfigs = [
+                [-0.48, 0.22, -0.34, 0.34],
+                [0.48, 0.22, 0.34, 0.34],
+                [-0.48, -0.22, -0.34, -0.34],
+                [0.48, -0.22, 0.34, -0.34],
+            ];
+            armConfigs.forEach(([motorX, motorZ, armX, armZ], index) => {
+                const arm = localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.055, 0.06), droneInk), armX * 0.5, 2.22, armZ * 0.5);
+                arm.rotation.y = Math.atan2(motorZ, motorX);
+                const motor = localAdd(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.12, 14), droneDark), motorX, 2.25, motorZ);
+                motor.rotation.x = Math.PI / 2;
+                const rotor = new THREE.Group();
+                rotor.position.set(motorX, 2.42 + droneLift, motorZ);
+                rotor.userData.kind = 'slide';
+                drone.add(rotor);
+                const hub = new THREE.Mesh(rotorHubGeo, droneInk);
+                hub.rotation.x = Math.PI / 2;
+                hub.castShadow = true;
+                rotor.add(hub);
+                const bladeA = new THREE.Mesh(rotorBladeGeo, droneInk);
+                const bladeB = new THREE.Mesh(rotorBladeGeo, droneInk);
+                bladeB.rotation.y = Math.PI / 2;
+                bladeA.castShadow = true;
+                bladeB.castShadow = true;
+                rotor.add(bladeA, bladeB);
+                droneSwarm.rotors.push({ group: rotor, phase: phase + index * 0.46, speed: 18 + index * 1.7, baseY: 2.42 + droneLift });
+            });
+
+            const eyeLeft = localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.035, 0.035), droneBlue), -0.12, 2.28, 0.36, -0.15);
+            const eyeRight = localAdd(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.035, 0.035), droneBlue), 0.12, 2.28, 0.36, 0.15);
+            eyeLeft.userData.baseScale = eyeLeft.scale.clone();
+            eyeRight.userData.baseScale = eyeRight.scale.clone();
+        };
+
+        [-4.1, -2.05, 0, 2.05, 4.1].forEach((x, index) => {
+            const zOffset = index % 2 === 0 ? 0.02 : -0.16;
+            addDrone(x, zOffset, index === 2 ? 1.08 : 0.98, index * 0.74);
+        });
+        group.userData.droneSwarm = droneSwarm;
     } else if (type.id === 'snakeDesk') {
+        const snakeRig = new THREE.Group();
+        snakeRig.userData.kind = 'block';
+        snakeRig.scale.set(1.18, 1.18, 1.12);
+        group.add(snakeRig);
+
+        const cobraParts = {
+            rig: snakeRig,
+            spots: [],
+            belly: [],
+            eyes: [],
+            pupils: [],
+            tongue: null,
+            head: null,
+            wallMode: true,
+            lookYaw: 0,
+            lookPitch: 0,
+        };
+
+        const addSnakeMesh = (mesh, x, y, zPos, rotZ = 0) => {
+            mesh.position.set(x, y, zPos);
+            mesh.rotation.z = rotZ;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.kind = 'block';
+            snakeRig.add(mesh);
+            return mesh;
+        };
+
+        const shadow = addSnakeMesh(
+            new THREE.Mesh(
+                new THREE.CircleGeometry(1.15, 34),
+                new THREE.MeshBasicMaterial({ color: 0x050705, transparent: true, opacity: 0.28, depthWrite: false })
+            ),
+            0,
+            0.035,
+            0.04
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.scale.set(1.25, 0.72, 1);
+
+        const cobraPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-0.72, 0.26, 0.08),
+            new THREE.Vector3(-1.02, 0.48, 0.02),
+            new THREE.Vector3(-0.82, 0.78, -0.1),
+            new THREE.Vector3(-0.16, 0.92, -0.12),
+            new THREE.Vector3(0.72, 0.68, 0.02),
+            new THREE.Vector3(0.9, 0.38, 0.12),
+            new THREE.Vector3(0.24, 0.2, 0.1),
+            new THREE.Vector3(-0.58, 0.34, -0.06),
+            new THREE.Vector3(-0.76, 0.7, -0.08),
+            new THREE.Vector3(-0.24, 1.04, -0.02),
+            new THREE.Vector3(0.3, 1.28, 0.02),
+            new THREE.Vector3(0.34, 1.72, 0.02),
+            new THREE.Vector3(0.12, 2.12, 0.04),
+            new THREE.Vector3(-0.06, 2.55, 0.08),
+            new THREE.Vector3(0.04, 2.94, 0.14),
+            new THREE.Vector3(0.18, 3.16, 0.22),
+        ]);
+
+        const cobraBody = new THREE.Mesh(new THREE.TubeGeometry(cobraPath, 130, 0.23, 18, false), snakeMat);
+        cobraBody.castShadow = true;
+        cobraBody.receiveShadow = true;
+        cobraBody.userData.kind = 'block';
+        snakeRig.add(cobraBody);
+        cobraParts.body = cobraBody;
+
+        const tail = addSnakeMesh(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.52, 10), snakeMat), -0.98, 0.42, 0.08);
+        tail.rotation.z = 1.2;
+        tail.rotation.x = -0.2;
+
+        const hoodBackLeft = addSnakeMesh(new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 14), snakeDark), -0.36, 2.68, 0.04);
+        hoodBackLeft.scale.set(0.72, 1.08, 0.24);
+        hoodBackLeft.rotation.z = -0.24;
+        const hoodBackRight = addSnakeMesh(new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 14), snakeDark), 0.38, 2.68, 0.04);
+        hoodBackRight.scale.set(0.72, 1.08, 0.24);
+        hoodBackRight.rotation.z = 0.24;
+        const hoodLeft = addSnakeMesh(new THREE.Mesh(new THREE.SphereGeometry(0.52, 24, 14), snakeMat), -0.32, 2.68, 0.1);
+        hoodLeft.scale.set(0.64, 0.98, 0.2);
+        hoodLeft.rotation.z = -0.22;
+        const hoodRight = addSnakeMesh(new THREE.Mesh(new THREE.SphereGeometry(0.52, 24, 14), snakeMat), 0.34, 2.68, 0.1);
+        hoodRight.scale.set(0.64, 0.98, 0.2);
+        hoodRight.rotation.z = 0.22;
+
+        for (let i = 0; i < 13; i++) {
+            const y = 1.06 + i * 0.14;
+            const x = Math.sin(i * 0.48) * 0.12;
+            const plate = addSnakeMesh(new THREE.Mesh(new THREE.BoxGeometry(0.44 - i * 0.01, 0.075, 0.055), snakeLight), x, y, 0.28, Math.sin(i * 0.6) * 0.12);
+            plate.userData.basePosition = plate.position.clone();
+            cobraParts.belly.push(plate);
+        }
+        for (let i = 0; i < 8; i++) {
+            const y = 2.08 + i * 0.13;
+            const plate = addSnakeMesh(new THREE.Mesh(new THREE.BoxGeometry(0.34 - i * 0.012, 0.065, 0.055), snakeLight), Math.sin(i * 0.55) * 0.06, y, 0.32, Math.sin(i) * 0.08);
+            plate.userData.basePosition = plate.position.clone();
+            cobraParts.belly.push(plate);
+        }
+
+        for (let i = 2; i < 35; i++) {
+            const point = cobraPath.getPoint(i / 36);
+            if (point.y > 2.78 && Math.abs(point.x) < 0.35) continue;
+            const spot = addSnakeMesh(
+                new THREE.Mesh(new THREE.DodecahedronGeometry(i % 3 === 0 ? 0.085 : 0.06, 0), i % 5 === 0 ? snakeLight : snakeDark),
+                point.x + (i % 2 ? 0.18 : -0.18),
+                point.y + 0.12,
+                point.z + (i % 2 ? 0.12 : -0.1)
+            );
+            spot.scale.set(1.1, 0.52, 0.75);
+            spot.rotation.y = i * 0.3;
+            spot.userData.basePosition = spot.position.clone();
+            cobraParts.spots.push(spot);
+        }
+
+        const headRig = new THREE.Group();
+        headRig.position.set(0.14, 3.18, 0.38);
+        headRig.userData.kind = 'block';
+        headRig.userData.baseRotation = headRig.rotation.clone();
+        snakeRig.add(headRig);
+        cobraParts.head = headRig;
+
+        const addHeadMesh = (mesh, x, y, zPos, rotZ = 0) => {
+            mesh.position.set(x, y, zPos);
+            mesh.rotation.z = rotZ;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.kind = 'block';
+            headRig.add(mesh);
+            return mesh;
+        };
+
+        const head = addHeadMesh(new THREE.Mesh(new THREE.DodecahedronGeometry(0.48, 0), snakeMat), 0, 0, 0);
+        head.scale.set(1.18, 0.76, 0.95);
+        const snout = addHeadMesh(new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 10), snakeMat), 0, -0.06, 0.3);
+        snout.scale.set(1.25, 0.62, 1.15);
+        const brow = addHeadMesh(new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.07, 0.1), snakeDark), 0, 0.15, 0.38, -0.04);
+        brow.userData.basePosition = brow.position.clone();
+
+        for (const eyeX of [-0.16, 0.16]) {
+            const eye = addHeadMesh(new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 8), red), eyeX, 0.16, 0.48);
+            eye.scale.set(1.18, 0.92, 0.72);
+            const pupil = addHeadMesh(new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 6), black), eyeX, 0.16, 0.545);
+            eye.userData.basePosition = eye.position.clone();
+            pupil.userData.basePosition = pupil.position.clone();
+            cobraParts.eyes.push(eye);
+            cobraParts.pupils.push(pupil);
+        }
+
+        for (const fangX of [-0.12, 0.12]) {
+            const fang = addHeadMesh(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.28, 8), white), fangX, -0.26, 0.5);
+            fang.rotation.x = Math.PI;
+            fang.rotation.z = fangX * 0.35;
+        }
+        const mouth = addHeadMesh(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.045, 0.08), black), 0, -0.18, 0.5);
+        mouth.rotation.z = -0.04;
+
+        const makeTongue = points => {
+            const curve = new THREE.CatmullRomCurve3(points.map(point => new THREE.Vector3(point[0], point[1], point[2])));
+            const tongue = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.022, 6, false), red);
+            tongue.castShadow = false;
+            tongue.receiveShadow = false;
+            tongue.userData.kind = 'block';
+            headRig.add(tongue);
+            return tongue;
+        };
+        const tongueStem = makeTongue([[0, -0.21, 0.56], [0.02, -0.34, 0.72], [0, -0.43, 0.86]]);
+        makeTongue([[0, -0.43, 0.86], [-0.09, -0.48, 0.98]]);
+        makeTongue([[0, -0.43, 0.86], [0.09, -0.48, 0.98]]);
+        tongueStem.userData.basePosition = tongueStem.position.clone();
+        cobraParts.tongue = tongueStem;
+
+        group.userData.snake = cobraParts;
+    } else if (false && type.id === 'snakeDesk') {
         const tableY = 2.42;
         const monitorY = 3.08;
         const tableWood = new THREE.MeshStandardMaterial({ color: 0x9b5528, roughness: 0.5, metalness: 0.02 });
@@ -4175,7 +5209,6 @@ function createObstacle(type, lane, z) {
         group.userData.snake = snakeParts;
     }
 
-    if (type.id !== 'snakeDesk' && type.id !== 'crtRunner' && type.id !== 'roadBlock' && type.id !== 'crateStack') addObstacleReadability(group, type);
     group.position.set(LANES[lane], 0, z);
     world.add(group);
     const obstacle = {
@@ -4187,6 +5220,7 @@ function createObstacle(type, lane, z) {
         hit: false,
     };
     liveObjects.push(obstacle);
+    rememberSpawnedObstacle(type);
     liftCollectiblesAroundJumpObstacle(obstacle);
     return obstacle;
 }
@@ -4213,6 +5247,36 @@ function isObstacleSpotClearOfCollectibles(type, lane, z) {
     });
 }
 
+function getCurrentPlayerLaneIndex() {
+    if (!player?.group) return targetLaneIndex;
+    let nearestLane = targetLaneIndex;
+    let nearestDistance = Infinity;
+    LANES.forEach((x, index) => {
+        const distance = Math.abs(player.group.position.x - x);
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestLane = index;
+        }
+    });
+    return nearestLane;
+}
+
+function getPredictedPlayerLaneIndex(leadSeconds = 0.36) {
+    if (!player?.group) return targetLaneIndex;
+    const targetX = LANES[targetLaneIndex];
+    const predictedX = targetX + (player.group.position.x - targetX) * Math.exp(-GAMEPLAY.laneEase * leadSeconds);
+    let nearestLane = targetLaneIndex;
+    let nearestDistance = Infinity;
+    LANES.forEach((x, index) => {
+        const distance = Math.abs(predictedX - x);
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestLane = index;
+        }
+    });
+    return nearestLane;
+}
+
 function findObstacleSpawnLane(type, z, candidateLanes = [0, 1, 2]) {
     const lanes = [...candidateLanes].sort(() => Math.random() - 0.5);
     return lanes.find(lane => isObstacleSpotClearOfCollectibles(type, lane, z));
@@ -4234,6 +5298,28 @@ function getObstacleWeight(type) {
     return type.weight ?? 1;
 }
 
+function getObstacleRepeatPenalty(type) {
+    const recentIndex = recentObstacleIds.indexOf(type.id);
+    if (recentIndex === -1) return 1;
+    return OBSTACLE_REPEAT_PENALTIES[recentIndex] ?? 0.7;
+}
+
+function getObstacleSpacingPenalty(type) {
+    const conflicts = OBSTACLE_SPACING_CONFLICTS[type.id];
+    if (!conflicts) return 1;
+    let penalty = 1;
+    Object.entries(conflicts).forEach(([otherId, penalties]) => {
+        const recentIndex = recentObstacleIds.indexOf(otherId);
+        if (recentIndex === -1) return;
+        penalty = Math.min(penalty, penalties[recentIndex] ?? 1);
+    });
+    return penalty;
+}
+
+function rememberSpawnedObstacle(type) {
+    recentObstacleIds = [type.id, ...recentObstacleIds.filter(id => id !== type.id)].slice(0, OBSTACLE_REPEAT_MEMORY);
+}
+
 function randomObstacleType(kind = null, { allowMultiLane = true, allowSolo = true } = {}) {
     const pool = OBSTACLE_TYPES.filter(type => {
         if (kind && type.kind !== kind) return false;
@@ -4241,10 +5327,10 @@ function randomObstacleType(kind = null, { allowMultiLane = true, allowSolo = tr
         if (!allowSolo && type.solo) return false;
         return true;
     });
-    const totalWeight = pool.reduce((sum, type) => sum + getObstacleWeight(type), 0);
+    const totalWeight = pool.reduce((sum, type) => sum + getObstacleWeight(type) * getObstacleRepeatPenalty(type) * getObstacleSpacingPenalty(type), 0);
     let roll = Math.random() * totalWeight;
     for (const type of pool) {
-        roll -= getObstacleWeight(type);
+        roll -= getObstacleWeight(type) * getObstacleRepeatPenalty(type) * getObstacleSpacingPenalty(type);
         if (roll <= 0) return type;
     }
     return pool[pool.length - 1];
@@ -4252,6 +5338,11 @@ function randomObstacleType(kind = null, { allowMultiLane = true, allowSolo = tr
 
 function spawnObstacleInLanes(type, z, candidateLanes = [0, 1, 2]) {
     let spawnType = type;
+    if (spawnType.solo) {
+        const targetedLane = getPredictedPlayerLaneIndex(0.32);
+        if (isObstacleSpotClearOfCollectibles(spawnType, targetedLane, z)) return createObstacle(spawnType, targetedLane, z);
+        return null;
+    }
     if (spawnType.multiLane) {
         if (isObstacleSpotClearOfCollectibles(spawnType, 1, z)) return createObstacle(spawnType, 1, z);
         spawnType = randomObstacleType(null, { allowMultiLane: false, allowSolo: false });
@@ -4269,7 +5360,7 @@ function spawnWave() {
     const z = -118;
     if (DEBUG_CRT_RUNNER_ONLY) {
         const crtRunner = OBSTACLE_TYPES.find(type => type.id === 'crtRunner');
-        if (crtRunner) createObstacle(crtRunner, targetLaneIndex, z);
+        if (crtRunner) createObstacle(crtRunner, getPredictedPlayerLaneIndex(0.32), z);
         return;
     }
     if (DEBUG_SNAKE_DESK_ONLY) {
@@ -4289,7 +5380,7 @@ function spawnWave() {
     }
     if (DEBUG_LOW_BARRIER_ONLY) {
         const lowBarrier = OBSTACLE_TYPES.find(type => type.id === 'lowBarrier');
-        if (lowBarrier) createObstacle(lowBarrier, targetLaneIndex, z);
+        if (lowBarrier) createObstacle(lowBarrier, 1, z);
         return;
     }
     if (DEBUG_ROAD_BLOCK_ONLY) {
@@ -4299,7 +5390,7 @@ function spawnWave() {
     }
     if (DEBUG_OVERHEAD_SIGN_ONLY) {
         const overheadSign = OBSTACLE_TYPES.find(type => type.id === 'overheadSign');
-        if (overheadSign) createObstacle(overheadSign, targetLaneIndex, z);
+        if (overheadSign) createObstacle(overheadSign, 1, z);
         return;
     }
     const firstObstacle = spawnObstacleInLanes(randomObstacleType(), z);
@@ -4361,6 +5452,7 @@ function spawnCollectibles() {
 }
 
 function clearRunObjects() {
+    recentObstacleIds = [];
     for (const obj of liveObjects.splice(0)) {
         obj.group.removeFromParent();
     }
@@ -4407,6 +5499,24 @@ function resetPlayerRootTransform() {
     }
 }
 
+function clearPlayerActionState({ ground = false } = {}) {
+    activeKeys.clear();
+    isSliding = false;
+    isFastDropping = false;
+    pendingGroundRoll = false;
+    slideTimer = 0;
+    slideElapsed = 0;
+    slideVisualDuration = GAMEPLAY.slideDuration;
+    rollRecoveryTimer = 0;
+    playerVelocityY = 0;
+    laneSlideKick = 0;
+    if (ground) player.group.position.y = 0;
+    player.group.rotation.z = 0;
+    player.group.scale.set(1, 1, 1);
+    resetPlayerRootTransform();
+    if (player.alertMark) player.alertMark.visible = false;
+}
+
 function keepPlayerRootAboveGround() {
     if (!player.root) return;
     player.root.updateMatrixWorld(true);
@@ -4450,7 +5560,8 @@ function resetGame() {
     hideQuizPanel();
     activeQuiz = null;
     quizRescueCount = 0;
-    quizQuestionCursor = 0;
+    if (!DEBUG_QUIZ_ORDERED_TEST) quizQuestionPools = {};
+    quizInvulnerabilityTimer = 0;
     score = 0;
     distance = 0;
     runTime = 0;
@@ -4475,6 +5586,7 @@ function resetGame() {
     isSliding = false;
     isFastDropping = false;
     pendingGroundRoll = false;
+    quizInvulnerabilityTimer = 0;
     slideTimer = 0;
     slideElapsed = 0;
     slideVisualDuration = GAMEPLAY.slideDuration;
@@ -4486,7 +5598,7 @@ function resetGame() {
     resetPlayerRootTransform();
     player.group.visible = true;
     selectorStage.visible = false;
-    player.shadow.visible = true;
+    player.shadow.visible = false;
     player.shieldAura.visible = false;
     if (player.alertMark) player.alertMark.visible = false;
     if (player.root) applyCustomizationToRoot(player.root);
@@ -4498,8 +5610,7 @@ function startGame() {
     activeKeys.clear();
     audioManager.unlock();
     resetGame();
-    audioManager.play('bgm');
-    audioManager.play('run');
+    audioManager.startRunMusic();
     audioManager.startAmbient();
     state = 'running';
     startCameraIntro = START_CAMERA_INTRO_DURATION;
@@ -4523,8 +5634,7 @@ function requestRetry() {
 }
 
 function endGame() {
-    audioManager.stop('bgm');
-    audioManager.stop('run');
+    audioManager.pauseMusicForGameOver();
     audioManager.stopAmbient();
     audioManager.play(score > bestScore ? 'record' : 'hit');
     quizPanel.hidden = true;
@@ -4540,6 +5650,7 @@ function endGame() {
     laneSlideKick = 0;
     player.group.rotation.z = 0;
     player.group.scale.set(1, 1, 1);
+    player.group.visible = true;
     resetPlayerRootTransform();
     if (player.usesModel) {
         playPlayerAction('Death', { fallback: 'Defeat', fade: 0.08 });
@@ -4556,7 +5667,9 @@ function endGame() {
 }
 
 function getQuizRuleForRun() {
-    return QUIZ_RULES.find(rule => runTime < rule.maxRunTime) || QUIZ_RULES[QUIZ_RULES.length - 1];
+    if (quizRescueCount > 1 || runTime >= 120) return QUIZ_RULES.hard;
+    if (quizRescueCount >= 1 || runTime >= 60) return QUIZ_RULES.medium;
+    return QUIZ_RULES.easy;
 }
 
 function shuffleQuizItems(items) {
@@ -4568,13 +5681,27 @@ function shuffleQuizItems(items) {
     return shuffled;
 }
 
+function getQuizQuestionForRule(rule) {
+    if (!quizQuestionPools[rule.id]?.length) {
+        const bank = QUIZ_QUESTIONS.filter(item => item.difficulty === rule.id);
+        quizQuestionPools[rule.id] = shuffleQuizItems(bank.length ? bank : QUIZ_QUESTIONS);
+    }
+    return quizQuestionPools[rule.id].pop();
+}
+
+function getOrderedQuizQuestionForTest() {
+    if (!QUIZ_QUESTIONS.length) return null;
+    const question = QUIZ_QUESTIONS[quizOrderedTestCursor % QUIZ_QUESTIONS.length];
+    quizOrderedTestCursor = (quizOrderedTestCursor + 1) % QUIZ_QUESTIONS.length;
+    return question;
+}
+
 function createQuizPayload() {
-    const rule = getQuizRuleForRun();
-    const bank = QUIZ_QUESTIONS.filter(item => item.difficulty === rule.id);
-    const questions = bank.length ? bank : QUIZ_QUESTIONS;
-    if (!questions.length) return null;
-    const question = questions[quizQuestionCursor % questions.length];
-    quizQuestionCursor++;
+    const question = DEBUG_QUIZ_ORDERED_TEST ? getOrderedQuizQuestionForTest() : getQuizQuestionForRule(getQuizRuleForRun());
+    if (!question) return null;
+    const rule = DEBUG_QUIZ_ORDERED_TEST
+        ? (QUIZ_RULES[question.difficulty] || QUIZ_RULES.easy)
+        : getQuizRuleForRun();
 
     const sourceOptions = question.options.map((text, index) => ({
         text,
@@ -4586,42 +5713,84 @@ function createQuizPayload() {
     if (correctOption && !selectedOptions.some(option => option.correct)) {
         selectedOptions[Math.max(0, selectedOptions.length - 1)] = correctOption;
     }
-    selectedOptions = shuffleQuizItems(selectedOptions);
+    if (!DEBUG_QUIZ_ORDERED_TEST) selectedOptions = shuffleQuizItems(selectedOptions);
 
     return {
         rule,
         question: question.question,
         options: selectedOptions,
         answerIndex: selectedOptions.findIndex(option => option.correct),
+        timeLimit: rule.timeLimit,
+        timeLeft: rule.timeLimit,
     };
+}
+
+function updateQuizTimerUi(payload = activeQuiz) {
+    if (!quizTimer || !quizTimerBar || !payload?.timeLimit) {
+        if (quizTimer) quizTimer.hidden = true;
+        if (quizTimer) delete quizTimer.dataset.warning;
+        if (quizTimerBar) quizTimerBar.style.transform = 'scaleX(1)';
+        return;
+    }
+    const ratio = THREE.MathUtils.clamp(payload.timeLeft / payload.timeLimit, 0, 1);
+    quizTimer.hidden = false;
+    quizTimerBar.style.transform = `scaleX(${ratio})`;
+    quizTimer.dataset.warning = ratio <= 0.32 ? 'true' : 'false';
 }
 
 function renderQuiz(payload) {
     quizDifficulty.textContent = payload.rule.label;
+    quizDifficulty.dataset.difficulty = payload.rule.id;
     quizQuestion.textContent = payload.question;
     quizFeedback.textContent = '';
     delete quizFeedback.dataset.kind;
     quizOptions.innerHTML = '';
     quizOptions.dataset.count = String(payload.options.length);
+    updateQuizTimerUi(payload);
     payload.options.forEach((option, index) => {
         const button = document.createElement('button');
         button.className = 'quiz-option';
         button.type = 'button';
         button.dataset.index = String(index);
-        button.textContent = `${String.fromCharCode(65 + index)}. ${option.text}`;
+        const letter = document.createElement('span');
+        letter.className = 'quiz-option-letter';
+        letter.textContent = `${String.fromCharCode(65 + index)})`;
+        const text = document.createElement('span');
+        text.className = 'quiz-option-text';
+        text.textContent = option.text;
+        button.append(letter, text);
         quizOptions.appendChild(button);
     });
     quizPanel.hidden = false;
-    const firstOption = quizOptions.querySelector('.quiz-option');
-    if (firstOption) setTimeout(() => firstOption.focus(), 60);
 }
 
 function hideQuizPanel() {
     quizPanel.hidden = true;
     quizOptions.innerHTML = '';
     delete quizOptions.dataset.count;
+    delete quizDifficulty.dataset.difficulty;
+    if (quizTimer) quizTimer.hidden = true;
+    if (quizTimer) delete quizTimer.dataset.warning;
+    if (quizTimerBar) quizTimerBar.style.transform = 'scaleX(1)';
     quizFeedback.textContent = '';
     delete quizFeedback.dataset.kind;
+}
+
+function timeOutQuiz() {
+    if (!activeQuiz || activeQuiz.locked) return;
+    activeQuiz.locked = true;
+    const quizId = activeQuiz.id;
+    revealQuizAnswer(activeQuiz.answerIndex, -1, true);
+    quizFeedback.textContent = 'Tempo esgotado.';
+    quizFeedback.dataset.kind = 'bad';
+    setTimeout(() => failQuizRescue(quizId), QUIZ_FAIL_REVEAL_DELAY);
+}
+
+function updateQuiz(delta) {
+    if (!activeQuiz || activeQuiz.locked || !activeQuiz.timeLimit) return;
+    activeQuiz.timeLeft = Math.max(0, activeQuiz.timeLeft - delta);
+    updateQuizTimerUi(activeQuiz);
+    if (activeQuiz.timeLeft <= 0) timeOutQuiz();
 }
 
 function startQuizRescue(obstacle) {
@@ -4640,9 +5809,9 @@ function startQuizRescue(obstacle) {
 
     state = 'quiz';
     activeKeys.clear();
-    audioManager.stop('run');
     audioManager.stopAmbient();
-    audioManager.play('hit');
+    audioManager.pauseMusicForQuiz();
+    audioManager.play('quizOpen');
     isSliding = false;
     isFastDropping = false;
     pendingGroundRoll = false;
@@ -4667,6 +5836,7 @@ function finishQuizRescue(quizId) {
     const rescuedObstacle = activeQuiz.obstacle;
     activeQuiz = null;
     hideQuizPanel();
+    audioManager.stopQuizMusic({ resumeMain: true });
 
     if (rescuedObstacle && liveObjects.includes(rescuedObstacle) && !rescuedObstacle.destroying) {
         startShieldDestroy(rescuedObstacle);
@@ -4674,9 +5844,9 @@ function finishQuizRescue(quizId) {
     }
 
     quizRescueCount++;
+    quizInvulnerabilityTimer = QUIZ_RECOVERY_INVULNERABILITY;
     state = 'running';
     clock.getDelta();
-    audioManager.play('run');
     audioManager.startAmbient();
     playPlayerAction('Run');
     showComboPopup('VIDA EXTRA!', '#20c997');
@@ -4689,7 +5859,23 @@ function failQuizRescue(quizId) {
     if (!activeQuiz || activeQuiz.id !== quizId) return;
     activeQuiz = null;
     hideQuizPanel();
+    audioManager.stopQuizMusic({ resumeMain: false });
     endGame();
+}
+
+function revealQuizAnswer(answerIndex, selectedIndex = -1, blinkCorrect = false) {
+    const buttons = [...quizOptions.querySelectorAll('.quiz-option')];
+    buttons.forEach((button, buttonIndex) => {
+        button.disabled = true;
+        button.dataset.selected = buttonIndex === selectedIndex ? 'true' : 'false';
+        if (buttonIndex === answerIndex) {
+            button.dataset.correct = 'true';
+            if (blinkCorrect) button.dataset.reveal = 'true';
+        }
+        if (selectedIndex >= 0 && buttonIndex === selectedIndex && buttonIndex !== answerIndex) {
+            button.dataset.wrong = 'true';
+        }
+    });
 }
 
 function answerQuiz(index) {
@@ -4698,22 +5884,16 @@ function answerQuiz(index) {
     activeQuiz.locked = true;
     const quizId = activeQuiz.id;
     const correct = index === activeQuiz.answerIndex;
-    const buttons = [...quizOptions.querySelectorAll('.quiz-option')];
-    buttons.forEach((button, buttonIndex) => {
-        button.disabled = true;
-        button.dataset.selected = buttonIndex === index ? 'true' : 'false';
-        if (buttonIndex === activeQuiz.answerIndex) button.dataset.correct = 'true';
-        if (!correct && buttonIndex === index) button.dataset.wrong = 'true';
-    });
+    revealQuizAnswer(activeQuiz.answerIndex, index, !correct);
 
     if (correct) {
         quizFeedback.textContent = 'Resposta certa. Vida recuperada.';
         quizFeedback.dataset.kind = 'ok';
-        setTimeout(() => finishQuizRescue(quizId), 620);
+        setTimeout(() => finishQuizRescue(quizId), QUIZ_SUCCESS_DELAY);
     } else {
-        quizFeedback.textContent = 'Resposta errada. A corrida acabou.';
+        quizFeedback.textContent = 'Resposta errada.';
         quizFeedback.dataset.kind = 'bad';
-        setTimeout(() => failQuizRescue(quizId), 820);
+        setTimeout(() => failQuizRescue(quizId), QUIZ_FAIL_REVEAL_DELAY);
     }
 }
 
@@ -5115,6 +6295,17 @@ function finishPendingGroundRoll() {
     playPlayerAction('Run', { fade: 0.05 });
 }
 
+function queueAirborneRoll() {
+    if (pendingGroundRoll) return;
+    pendingGroundRoll = true;
+    isSliding = false;
+    isFastDropping = true;
+    slideTimer = 0;
+    slideElapsed = 0;
+    playerVelocityY = -GAMEPLAY.fastDropVelocity;
+    playPlayerAction('Jump', { fade: 0.05 });
+}
+
 function getObjectHitbox(obj) {
     const box = obj.hitbox;
     const y = obj.group.position.y || 0;
@@ -5148,6 +6339,111 @@ function canCollectObject(obj, dx, dz) {
     const playerCollectY = player.group.position.y + COLLECTIBLE_PATH.playerCenterY;
     const dy = Math.abs(obj.group.position.y - playerCollectY);
     return dx < obj.radius && dz < obj.radius && dy < COLLECTIBLE_PATH.verticalCollectRadius;
+}
+
+function updateNetworkRouterObstacle(obj, delta, t) {
+    obj.group.position.y = Math.abs(Math.sin(t * 5 + obj.group.position.z)) * 0.025;
+    const rig = obj.group.userData.networkRouters;
+    if (!rig) return;
+
+    rig.signals.forEach(({ core, outline, phase, baseCorePosition, baseOutlinePosition }, index) => {
+        const flow = (t * 1.35 + phase * 0.17 + index * 0.09) % 1;
+        const breathe = Math.sin(flow * Math.PI);
+        const jitter = Math.sin(t * 8.4 + phase + index) * 0.025;
+        const lift = flow * 0.18;
+        const spread = 1 + flow * 0.1 + breathe * 0.05;
+        const opacity = 0.2 + breathe * 0.78;
+
+        core.position.copy(baseCorePosition);
+        outline.position.copy(baseOutlinePosition);
+        core.position.x += jitter;
+        outline.position.x += jitter;
+        core.position.y += lift;
+        outline.position.y += lift;
+        core.position.z += Math.sin(t * 5.2 + phase) * 0.018;
+        outline.position.z = core.position.z - 0.012;
+
+        core.material.opacity = opacity;
+        outline.material.opacity = 0.22 + opacity * 0.52;
+        core.scale.set(spread, 1 + breathe * 0.16, spread);
+        outline.scale.copy(core.scale);
+    });
+
+    rig.bits.forEach(({ mesh, basePosition, phase }, index) => {
+        const wave = Math.sin(t * 4.6 + phase);
+        mesh.position.x = basePosition.x + wave * 0.035;
+        mesh.position.y = basePosition.y + Math.sin(t * 5.8 + phase) * 0.055;
+        mesh.rotation.z += delta * (0.8 + index * 0.035);
+        mesh.material.opacity = 0.38 + Math.abs(Math.sin(t * 6.8 + phase)) * 0.48;
+    });
+
+    rig.leds.forEach(({ mesh, phase }) => {
+        const blink = 0.32 + Math.abs(Math.sin(t * 9.5 + phase)) * 0.68;
+        mesh.material.emissiveIntensity = 0.32 + blink * 0.85;
+        mesh.scale.setScalar(0.85 + blink * 0.22);
+    });
+
+    rig.bodies.forEach(({ group: routerGroup, phase, baseYaw = 0 }) => {
+        routerGroup.rotation.z = Math.sin(t * 3.4 + phase) * 0.018;
+        routerGroup.rotation.y = baseYaw + Math.sin(t * 2.6 + phase) * 0.025;
+        routerGroup.position.y = Math.abs(Math.sin(t * 5.2 + phase)) * 0.025;
+    });
+}
+
+function updateLowBarrierObstacle(obj, delta, t) {
+    obj.group.position.y = Math.sin(t * 4.1 + obj.group.position.z * 0.08) * 0.018;
+    const rig = obj.group.userData.lowBarrierNetwork;
+    if (!rig) return;
+
+    rig.pulses.forEach(({ mesh, startX, endX, y, z, phase, speed }, index) => {
+        const flow = (t * speed + phase) % 1;
+        const pulse = Math.sin(flow * Math.PI);
+        mesh.position.x = THREE.MathUtils.lerp(startX, endX, flow);
+        mesh.position.y = y + Math.sin(t * 8.5 + index) * 0.018;
+        mesh.position.z = z + Math.cos(t * 6.2 + index) * 0.012;
+        mesh.rotation.z = Math.sin(t * 5.8 + phase * 8) * 0.18;
+        mesh.scale.x = 0.7 + pulse * 0.8;
+        mesh.material.emissiveIntensity = 0.24 + pulse * 0.72;
+    });
+
+    rig.sparks.forEach(({ mesh, basePosition, phase }, index) => {
+        const flicker = Math.abs(Math.sin(t * 7.8 + phase));
+        mesh.position.copy(basePosition);
+        mesh.position.x += Math.sin(t * 2.6 + phase) * 0.05;
+        mesh.position.y += Math.sin(t * 5.4 + phase) * 0.06;
+        mesh.rotation.z += delta * (1.5 + (index % 4) * 0.35);
+        mesh.scale.setScalar(0.45 + flicker * 0.95);
+        if (mesh.material.emissive) mesh.material.emissiveIntensity = 0.08 + flicker * 0.7;
+    });
+
+    rig.glows.forEach(({ mesh, phase }) => {
+        mesh.material.opacity = 0.24 + Math.abs(Math.sin(t * 3.9 + phase)) * 0.34;
+    });
+
+    rig.leds.forEach(({ mesh, phase }) => {
+        const blink = Math.abs(Math.sin(t * 8.2 + phase));
+        mesh.scale.setScalar(0.8 + blink * 0.32);
+        if (mesh.material.emissive) mesh.material.emissiveIntensity = 0.28 + blink * 0.8;
+    });
+}
+
+function updateDroneSwarmObstacle(obj, delta, t) {
+    const swarm = obj.group.userData.droneSwarm;
+    if (!swarm) return;
+
+    swarm.drones.forEach(({ group: drone, phase, baseZ }, index) => {
+        const hover = Math.sin(t * 4.1 + phase);
+        drone.position.y = hover * 0.07;
+        drone.position.z = baseZ + Math.sin(t * 2.7 + phase) * 0.035;
+        drone.rotation.z = Math.sin(t * 3.8 + phase) * 0.045;
+        drone.rotation.x = Math.cos(t * 3.2 + phase) * 0.025;
+        if (index === 2) drone.scale.setScalar(1.08 + Math.sin(t * 4 + phase) * 0.015);
+    });
+
+    swarm.rotors.forEach(({ group: rotor, phase, speed, baseY }, index) => {
+        rotor.rotation.y += delta * speed * (index % 2 === 0 ? 1 : -1);
+        rotor.position.y = baseY + Math.sin(t * 6.4 + phase) * 0.025;
+    });
 }
 
 function updateGlitchVirusObstacle(obj, delta, t) {
@@ -5263,18 +6559,18 @@ function updateGlitchVirusObstacle(obj, delta, t) {
         const ageFade = naturalFade * dissolveFade;
         const indexFade = Math.max(0.35, THREE.MathUtils.clamp(1 - index / virus.trailPlanes.length, 0, 1));
         const pulse = 0.9 + Math.sin(t * 12 + point.phase) * 0.14;
-        const bubble = Math.sin(ageRatio * Math.PI) * (0.045 + Math.sin(t * 9 + point.phase) * 0.012);
+        const bubble = Math.sin(ageRatio * Math.PI) * (0.012 + Math.sin(t * 9 + point.phase) * 0.004);
         const x = point.x - obj.group.position.x;
         const z = point.z + Math.sin(t * 5 + point.phase) * 0.012;
         const rot = point.rot + Math.sin(t * 5 + point.phase) * 0.028;
         rim.visible = true;
         core.visible = true;
         spark.visible = ageRatio < 0.55 || point.dissolving;
-        rim.position.set(x, 0.044 + index * 0.0015, z);
-        core.position.set(x, 0.082 + bubble + index * 0.0015, z);
+        rim.position.set(x, 0.03 + index * 0.0002, z);
+        core.position.set(x, 0.05 + bubble + index * 0.0002, z);
         spark.position.set(
             x + Math.sin(t * 11 + point.phase) * 0.035,
-            0.18 + bubble * 2.0 + Math.sin(ageRatio * Math.PI) * 0.14,
+            0.075 + bubble * 0.6 + Math.sin(ageRatio * Math.PI) * 0.025,
             z + Math.cos(t * 9 + point.phase) * 0.03
         );
         rim.rotation.y = rot;
@@ -5307,9 +6603,10 @@ function updateSnakeDeskObstacle(obj, t, delta) {
     const snake = obj.group.userData.snake;
     if (!snake) return;
 
-    const phase = t * 5.2 + obj.group.position.z * 0.08;
-    snake.rig.position.y = Math.sin(phase) * 0.04;
-    snake.rig.rotation.z = Math.sin(phase * 0.62) * 0.018;
+    const wallMode = Boolean(snake.wallMode);
+    const phase = t * (wallMode ? 3.6 : 5.2) + obj.group.position.z * 0.08;
+    snake.rig.position.y = Math.sin(phase) * (wallMode ? 0.014 : 0.04);
+    snake.rig.rotation.z = Math.sin(phase * 0.62) * (wallMode ? 0.006 : 0.018);
 
     const lookEase = 1 - Math.exp(-14 * delta);
     let lookYaw = snake.lookYaw ?? 0;
@@ -5334,9 +6631,9 @@ function updateSnakeDeskObstacle(obj, t, delta) {
 
         const base = snake.head.userData.baseRotation;
         snake.head.rotation.set(
-            base.x + lookPitch + Math.sin(phase * 0.72) * 0.026,
+            base.x + lookPitch + Math.sin(phase * 0.72) * (wallMode ? 0.01 : 0.026),
             base.y + lookYaw,
-            base.z + lookYaw * -0.08 + Math.sin(phase * 0.58) * 0.028
+            base.z + lookYaw * -0.08 + Math.sin(phase * 0.58) * (wallMode ? 0.012 : 0.028)
         );
     }
 
@@ -5354,17 +6651,17 @@ function updateSnakeDeskObstacle(obj, t, delta) {
     for (let i = 0; i < snake.spots.length; i++) {
         const spot = snake.spots[i];
         const base = spot.userData.basePosition;
-        if (base) spot.position.y = base.y + Math.sin(phase + i * 0.55) * 0.035;
+        if (base) spot.position.y = base.y + Math.sin(phase + i * 0.55) * (wallMode ? 0.012 : 0.035);
     }
     for (let i = 0; i < snake.belly.length; i++) {
         const belly = snake.belly[i];
         const base = belly.userData.basePosition;
-        if (base) belly.position.y = base.y + Math.sin(phase + i * 0.45) * 0.025;
+        if (base) belly.position.y = base.y + Math.sin(phase + i * 0.45) * (wallMode ? 0.008 : 0.025);
     }
     if (snake.tongue?.userData.basePosition) {
         snake.tongue.position.copy(snake.tongue.userData.basePosition);
-        snake.tongue.position.z += Math.max(0, Math.sin(phase * 2.2)) * 0.12;
-        snake.tongue.scale.z = 1 + Math.max(0, Math.sin(phase * 2.2)) * 0.34;
+        snake.tongue.position.z += Math.max(0, Math.sin(phase * 2.2)) * (wallMode ? 0.07 : 0.12);
+        snake.tongue.scale.z = 1 + Math.max(0, Math.sin(phase * 2.2)) * (wallMode ? 0.18 : 0.34);
     }
 }
 
@@ -5447,11 +6744,17 @@ function updateCrtRunnerObstacle(obj, delta, t) {
     const closeEase = closeProgress * closeProgress * (3 - 2 * closeProgress);
 
     if (warningActive) {
+        const predictionLead = THREE.MathUtils.lerp(0.28, 0.48, getDifficultyProgress());
+        runner.predictedLane = getPredictedPlayerLaneIndex(predictionLead);
+        const predictedX = LANES[runner.predictedLane];
+        obj.group.position.x += (predictedX - obj.group.position.x) * (1 - Math.exp(-13 * delta));
         obj.group.position.z -= speed * delta;
         showPlayerCrtAlert(openEase, t, runner);
         runner.body.visible = summonProgress > 0.58;
     } else {
         if (!runner.launched) {
+            obj.group.position.x = LANES[runner.predictedLane ?? getPredictedPlayerLaneIndex(0.22)];
+            obj.lane = runner.predictedLane ?? getCurrentPlayerLaneIndex();
             obj.group.position.z += runner.summonZ;
             runner.body.position.z = 0;
             runner.portal.position.z = -0.08;
@@ -5534,6 +6837,16 @@ function breakPlayerShieldVisual() {
     aura.visible = false;
 }
 
+function updateQuizInvulnerability(delta, t) {
+    if (quizInvulnerabilityTimer <= 0) {
+        if (state === 'running') player.group.visible = true;
+        return;
+    }
+    quizInvulnerabilityTimer = Math.max(0, quizInvulnerabilityTimer - delta);
+    const visible = quizInvulnerabilityTimer <= 0 || Math.sin(t * 32) > -0.15;
+    player.group.visible = visible;
+}
+
 function updateRunning(delta, t) {
     runTime += delta;
     distance += speed * delta;
@@ -5555,7 +6868,7 @@ function updateRunning(delta, t) {
         spawnWave();
         spawnTimer = DEBUG_SINGLE_OBSTACLE_ONLY
             ? 3.0
-            : getDifficultyValue(DIFFICULTY_TUNING.spawnStart, DIFFICULTY_TUNING.spawnEnd) + Math.random() * 0.08;
+            : getDifficultyValue(DIFFICULTY_TUNING.spawnStart, DIFFICULTY_TUNING.spawnEnd) + Math.random() * 0.05;
     }
     if (collectibleTimer <= 0) {
         spawnCollectibles();
@@ -5569,6 +6882,7 @@ function updateRunning(delta, t) {
         if (shield <= 0) breakPlayerShieldVisual();
     }
     if (rollRecoveryTimer > 0) rollRecoveryTimer = Math.max(0, rollRecoveryTimer - delta);
+    updateQuizInvulnerability(delta, t);
     const targetX = LANES[targetLaneIndex];
     player.group.position.x += (targetX - player.group.position.x) * (1 - Math.exp(-GAMEPLAY.laneEase * delta));
     const wasAirborne = player.group.position.y > 0.05;
@@ -5582,7 +6896,7 @@ function updateRunning(delta, t) {
             burstAt(player.group.position.x, 0.22, player.group.position.z - 0.25, getCurrentAccentColor());
         } else if (isFastDropping || wasAirborne) {
             isFastDropping = false;
-            slideTimer = Math.max(slideTimer, 0.18);
+            slideTimer = 0;
             if (wasAirborne) burstAt(player.group.position.x, 0.22, player.group.position.z - 0.25, getCurrentAccentColor());
         }
     }
@@ -5654,13 +6968,17 @@ function updateRunning(delta, t) {
             obj.group.rotation.y += delta * 2.8;
             obj.group.rotation.z = 0;
         } else if (obj.obstacleType?.id === 'trafficCones') {
-            obj.group.position.y = Math.abs(Math.sin(t * 5 + obj.group.position.z)) * 0.025;
+            updateNetworkRouterObstacle(obj, delta, t);
+        } else if (obj.obstacleType?.id === 'lowBarrier') {
+            updateLowBarrierObstacle(obj, delta, t);
         } else if (obj.obstacleType?.id === 'roadBlock') {
             updateGlitchVirusObstacle(obj, delta, t);
         } else if (obj.obstacleType?.id === 'snakeDesk') {
             updateSnakeDeskObstacle(obj, t, delta);
         } else if (obj.obstacleType?.id === 'crtRunner') {
             updateCrtRunnerObstacle(obj, delta, t);
+        } else if (obj.obstacleType?.id === 'overheadSign') {
+            updateDroneSwarmObstacle(obj, delta, t);
         } else if (obj.obstacleType?.kind === 'slide') {
             obj.group.rotation.y = Math.sin(t * 3.2 + obj.group.position.z) * 0.08;
         }
@@ -5699,9 +7017,9 @@ function updateRunning(delta, t) {
             comboTimer = 2.1;
             addScore(SCORE_TUNING.bitcoin);
             showComboPopup('BITCOIN!', '#f7931a');
-            showLearn({ tag: 'DBG', title: 'Debug', copy: 'Programar tambem e testar, corrigir e melhorar.' });
+            showLearn({ tag: 'DBG', title: 'Debug', copy: 'Programar também é testar, corrigir e melhorar.' });
             collectBurstAt(obj.group.position.x, obj.group.position.y + 0.15, obj.group.position.z, 0xd08a20, 'bitcoin');
-        } else if (obj.type === 'obstacle' && canObstacleHitPlayer(obj) && intersectsBox(getPlayerHitbox(), getObjectHitbox(obj), GAMEPLAY.collisionPadding)) {
+        } else if (obj.type === 'obstacle' && quizInvulnerabilityTimer <= 0 && canObstacleHitPlayer(obj) && intersectsBox(getPlayerHitbox(), getObjectHitbox(obj), GAMEPLAY.collisionPadding)) {
             combo = 0;
             comboTimer = 0;
             if (shield > 0) {
@@ -5721,7 +7039,6 @@ function updateRunning(delta, t) {
             obj.scoredDodge = true;
             const closeDodge = Math.abs(obj.group.position.x - player.group.position.x) < 2.15;
             addScore(closeDodge ? SCORE_TUNING.dodgeClose : SCORE_TUNING.dodgeFar);
-            if (closeDodge) showComboPopup('DESVIO!', '#ffc94a');
         }
     }
 
@@ -5822,6 +7139,7 @@ function animate() {
     }
 
     if (state === 'running') updateRunning(delta, t);
+    if (state === 'quiz') updateQuiz(delta);
     if (state !== 'paused') {
         if (player.usesModel) player.mixer.update(delta);
         updateSelectorStage(delta, t);
@@ -5870,11 +7188,12 @@ function updatePauseUi() {
     hud.dataset.state = state;
     rankingPanel.dataset.state = state;
     document.getElementById('game-shell').dataset.state = state;
+    updateMusicUi();
 }
 
 function pauseGame() {
     if (state !== 'running') return;
-    audioManager.stop('run');
+    activeKeys.clear();
     audioManager.stopAmbient();
     state = 'paused';
     updatePauseUi();
@@ -5883,7 +7202,7 @@ function pauseGame() {
 
 function resumeGame() {
     if (state !== 'paused') return;
-    audioManager.play('run');
+    clearPlayerActionState({ ground: true });
     audioManager.startAmbient();
     state = 'running';
     clock.getDelta();
@@ -5893,8 +7212,7 @@ function resumeGame() {
 }
 
 function showMenu() {
-    audioManager.stop('bgm');
-    audioManager.stop('run');
+    audioManager.stopQuizMusic({ resumeMain: false });
     audioManager.stopAmbient();
     clearRunObjects();
     resetVisualWorldLoops();
@@ -5912,6 +7230,7 @@ function showMenu() {
     startScreen.hidden = false;
     startScreen.classList.add('screen-open');
     updateCharacterSelection({ syncPlayer: false });
+    audioManager.startMenuMusic();
     updatePauseUi();
     renderRanking();
 }
@@ -5944,22 +7263,14 @@ function jump() {
 function slide() {
     if (state !== 'running') return;
     if (!isPlayerGrounded()) {
-        if (pendingGroundRoll || isFastDropping) return;
-        pendingGroundRoll = true;
-        isSliding = false;
-        slideElapsed = 0;
-        isFastDropping = true;
-        playerVelocityY = Math.min(playerVelocityY, -GAMEPLAY.fastDropVelocity);
-        slideTimer = Math.max(slideTimer, GAMEPLAY.airborneSlideDuration);
-        resetPlayerRootTransform();
-        playPlayerAction('Jump', { fade: 0.05 });
-        audioManager.play('slide');
+        queueAirborneRoll();
         return;
     }
     beginGroundRoll();
 }
 
 function openCustomize() {
+    audioManager.stopQuizMusic({ resumeMain: false });
     state = 'customize';
     hideQuizPanel();
     activeQuiz = null;
@@ -6033,13 +7344,7 @@ window.addEventListener('keydown', event => {
         return;
     }
     if (state === 'quiz') {
-        const letterIndex = ['a', 'b', 'c', 'd'].indexOf(key);
-        const numberIndex = ['1', '2', '3', '4'].indexOf(key);
-        const optionIndex = letterIndex >= 0 ? letterIndex : numberIndex;
-        if (optionIndex >= 0) {
-            event.preventDefault();
-            answerQuiz(optionIndex);
-        }
+        event.preventDefault();
         return;
     }
     if (key === 'arrowleft' || key === 'a') moveLane(-1);
@@ -6098,6 +7403,15 @@ btnPauseMenu.addEventListener('click', showMenu);
 btnConfirmRetry.addEventListener('click', startGame);
 btnCancelRetry.addEventListener('click', () => {
     newRunConfirm.hidden = true;
+});
+musicPrev.addEventListener('click', () => audioManager.previousMusic());
+musicToggle.addEventListener('click', () => audioManager.toggleMusic());
+musicNext.addEventListener('click', () => audioManager.nextMusic());
+musicRandom.addEventListener('click', () => {
+    audioManager.setMusicShuffle(!audioManager.musicShuffle);
+});
+musicVolume.addEventListener('input', () => {
+    audioManager.setMusicVolume(Number(musicVolume.value) / 100);
 });
 rankingList.addEventListener('click', event => {
     const button = event.target.closest('.ranking-delete');
@@ -6178,7 +7492,7 @@ function formatRankingTime(secondsValue) {
 
 function getPotentialRankingPosition(scoreValue, timeValue) {
     const candidate = {
-        name: 'VOCE',
+        name: 'VOCÊ',
         score: Math.max(0, Math.floor(scoreValue)),
         time: Math.max(0, Math.floor(timeValue)),
         current: true,
@@ -6277,7 +7591,7 @@ function renderRanking() {
     let displayRanking;
     if (liveMode) {
         const currentRun = {
-            name: 'VOCE',
+            name: 'VOCÊ',
             score: Math.floor(score),
             time: Math.floor(runTime),
             current: true,
