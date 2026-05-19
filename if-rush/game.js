@@ -7364,7 +7364,13 @@ window.addEventListener('keyup', event => {
 
 let touchStart = null;
 window.addEventListener('pointerdown', event => {
-    touchStart = { x: event.clientX, y: event.clientY };
+    if (!event.isPrimary || event.button > 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('button, input, select, textarea, a, label, .quiz-panel, .pause-panel, .customize-panel, .music-player, .ranking-panel, .screen')) {
+        touchStart = null;
+        return;
+    }
+    touchStart = { x: event.clientX, y: event.clientY, type: event.pointerType || 'mouse' };
 });
 
 window.addEventListener('pointerup', event => {
@@ -7374,7 +7380,7 @@ window.addEventListener('pointerup', event => {
     const ax = Math.abs(dx);
     const ay = Math.abs(dy);
     if (Math.max(ax, ay) < 18) {
-        jump();
+        if (touchStart.type !== 'mouse') jump();
     } else if (ax > ay) {
         moveLane(dx > 0 ? 1 : -1);
     } else if (dy < 0) {

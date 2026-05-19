@@ -662,8 +662,8 @@ h1 {
     height: 4px;
     margin-top: 14px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #d83c32, #f15f4f, #d83c32);
-    opacity: 0.88;
+    background: var(--ink);
+    opacity: 0.86;
 }
 
 .quiz-options {
