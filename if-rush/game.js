@@ -639,6 +639,7 @@ let customIndex = loadCustomizeState();
 let previewLoadToken = 0;
 let playerLoadToken = 0;
 let rankingRefreshTimer = 0;
+let rankingSyncTimer = 0;
 let startCameraIntro = 0;
 
 const START_CAMERA_INTRO_DURATION = 0.92;
@@ -1466,6 +1467,7 @@ for (let i = 0; i < CLOUD_COUNT; i++) {
 scene.add(createInstitute());
 await syncRanking();
 renderRanking();
+scheduleRankingSync();
 updateCharacterSelection();
 updatePauseUi();
 
@@ -7364,6 +7366,11 @@ window.addEventListener('keyup', event => {
     activeKeys.delete(event.code.toLowerCase());
 });
 
+window.addEventListener('focus', () => syncRanking({ render: true, useLocalFallback: false }));
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncRanking({ render: true, useLocalFallback: false });
+});
+
 let touchStart = null;
 window.addEventListener('pointerdown', event => {
     if (!event.isPrimary || event.button > 0) return;
@@ -7563,10 +7570,27 @@ async function syncRankingFromEndpoint(endpoint, source) {
     }
 }
 
-async function syncRanking() {
-    if (await syncRankingFromEndpoint(ONLINE_RANKING_ENDPOINT, 'online')) return;
-    if (await syncRankingFromEndpoint(LOCAL_RANKING_ENDPOINT, 'local')) return;
-    rankingSource = 'local';
+async function syncRanking(options = {}) {
+    const { render = false, useLocalFallback = true } = options;
+    if (await syncRankingFromEndpoint(ONLINE_RANKING_ENDPOINT, 'online')) {
+        if (render) renderRanking();
+        return true;
+    }
+    if (useLocalFallback && !rankingCache.length && await syncRankingFromEndpoint(LOCAL_RANKING_ENDPOINT, 'local')) {
+        if (render) renderRanking();
+        return true;
+    }
+    if (!rankingCache.length) rankingSource = 'local';
+    if (render) renderRanking();
+    return false;
+}
+
+function scheduleRankingSync(delay = 2200) {
+    clearTimeout(rankingSyncTimer);
+    rankingSyncTimer = setTimeout(async () => {
+        const synced = await syncRanking({ render: true, useLocalFallback: false });
+        if (!synced) scheduleRankingSync(5000);
+    }, delay);
 }
 
 async function persistRankingOnline(entry) {

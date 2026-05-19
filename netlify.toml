@@ -8,6 +8,16 @@ to = "/.netlify/functions/ranking"
 status = 200
 
 [[headers]]
+for = "/if-rush/"
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+for = "/if-rush/index.html"
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
 for = "/*"
 [headers.values]
 X-Content-Type-Options = "nosniff"
