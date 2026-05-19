@@ -7421,10 +7421,12 @@ musicRandom.addEventListener('click', () => {
 musicVolume.addEventListener('input', () => {
     audioManager.setMusicVolume(Number(musicVolume.value) / 100);
 });
-rankingList.addEventListener('click', event => {
+rankingList.addEventListener('click', async event => {
     const button = event.target.closest('.ranking-delete');
     if (!button) return;
-    deleteRankingEntry(Number(button.dataset.rankingIndex));
+    button.disabled = true;
+    await deleteRankingEntry(Number(button.dataset.rankingIndex));
+    button.disabled = false;
 });
 rankingEditorToggle.addEventListener('click', () => {
     if (state === 'running' || state === 'paused' || state === 'quiz') return;

@@ -132,12 +132,12 @@ export default async function rankingHandler(request) {
                 deleteIndex = currentRanking.findIndex(entry => entriesMatch(entry, targetEntry));
             }
             if (deleteIndex < 0) {
-                return jsonResponse(404, { error: 'ranking_entry_not_found', ranking: currentRanking });
+                return jsonResponse(200, { ranking: currentRanking, source: 'online', deleted: false });
             }
 
             const ranking = currentRanking.filter((_, index) => index !== deleteIndex);
             await writeRanking(ranking);
-            return jsonResponse(200, { ranking, source: 'online' });
+            return jsonResponse(200, { ranking, source: 'online', deleted: true });
         } catch {
             return jsonResponse(503, { error: 'ranking_unavailable', ranking: [] });
         }
