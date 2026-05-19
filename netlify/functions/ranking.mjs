@@ -50,6 +50,14 @@ function normalizeRanking(input) {
         .slice(0, RANKING_LIMIT);
 }
 
+function entriesMatch(entry, target) {
+    return entry
+        && target
+        && entry.name === target.name
+        && entry.score === target.score
+        && entry.time === target.time;
+}
+
 async function readRanking() {
     const store = getStore(STORE_NAME);
     const savedRanking = await store.get(RANKING_KEY, { type: 'json' });
@@ -81,7 +89,7 @@ export default async function rankingHandler(request) {
         return new Response(null, {
             status: 204,
             headers: {
-                Allow: 'GET, POST, OPTIONS',
+                Allow: 'GET, POST, DELETE, OPTIONS',
             },
         });
     }
@@ -105,6 +113,29 @@ export default async function rankingHandler(request) {
         try {
             const currentRanking = await readRanking();
             const ranking = normalizeRanking([...currentRanking, entry]);
+            await writeRanking(ranking);
+            return jsonResponse(200, { ranking, source: 'online' });
+        } catch {
+            return jsonResponse(503, { error: 'ranking_unavailable', ranking: [] });
+        }
+    }
+
+    if (request.method === 'DELETE') {
+        const payload = await readRequestJson(request);
+        const requestedIndex = Math.floor(Number(payload?.index));
+        const targetEntry = normalizeScoreEntry(payload?.entry);
+
+        try {
+            const currentRanking = await readRanking();
+            let deleteIndex = Number.isInteger(requestedIndex) ? requestedIndex : -1;
+            if (deleteIndex < 0 || deleteIndex >= currentRanking.length || (targetEntry && !entriesMatch(currentRanking[deleteIndex], targetEntry))) {
+                deleteIndex = currentRanking.findIndex(entry => entriesMatch(entry, targetEntry));
+            }
+            if (deleteIndex < 0) {
+                return jsonResponse(404, { error: 'ranking_entry_not_found', ranking: currentRanking });
+            }
+
+            const ranking = currentRanking.filter((_, index) => index !== deleteIndex);
             await writeRanking(ranking);
             return jsonResponse(200, { ranking, source: 'online' });
         } catch {

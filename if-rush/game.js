@@ -7428,7 +7428,6 @@ rankingList.addEventListener('click', event => {
 });
 rankingEditorToggle.addEventListener('click', () => {
     if (state === 'running' || state === 'paused' || state === 'quiz') return;
-    if (rankingSource === 'online') return;
     rankingEditorEnabled = !rankingEditorEnabled;
     renderRanking();
 });
@@ -7591,26 +7590,44 @@ async function saveScore(entry) {
     }
 }
 
+async function deleteRankingOnline(index, entry) {
+    try {
+        const response = await fetch(ONLINE_RANKING_ENDPOINT, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index, entry }),
+        });
+        if (!response.ok) return false;
+        const payload = await response.json();
+        setRanking(payload, { source: 'online' });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 async function deleteRankingEntry(index) {
     if (!rankingEditorEnabled || state === 'running' || state === 'paused' || state === 'quiz') return;
-    if (rankingSource === 'online') return;
     if (index < 0 || index >= rankingCache.length) return;
-    setRanking(rankingCache.filter((_, itemIndex) => itemIndex !== index), { source: 'local' });
+    if (rankingSource === 'online') {
+        const deletedOnline = await deleteRankingOnline(index, rankingCache[index]);
+        if (!deletedOnline) return;
+    } else {
+        setRanking(rankingCache.filter((_, itemIndex) => itemIndex !== index), { source: 'local' });
+    }
     renderRanking();
 }
 
 function renderRanking() {
     const ranking = getRanking();
     const liveMode = state === 'running' || state === 'paused' || state === 'quiz';
-    const canEditRanking = rankingSource !== 'online';
     const limit = liveMode ? 5 : 10;
     rankingPanel.dataset.mode = liveMode ? 'live' : 'full';
     rankingPanel.dataset.source = rankingSource;
     rankingTitle.textContent = rankingSource === 'online' ? 'Ranking online' : 'Ranking local';
-    if (!canEditRanking) rankingEditorEnabled = false;
-    rankingPanel.dataset.editor = rankingEditorEnabled && !liveMode && canEditRanking ? 'true' : 'false';
-    rankingEditorToggle.hidden = liveMode || !canEditRanking;
-    rankingEditorToggle.setAttribute('aria-pressed', rankingEditorEnabled && !liveMode && canEditRanking ? 'true' : 'false');
+    rankingPanel.dataset.editor = rankingEditorEnabled && !liveMode ? 'true' : 'false';
+    rankingEditorToggle.hidden = liveMode;
+    rankingEditorToggle.setAttribute('aria-pressed', rankingEditorEnabled && !liveMode ? 'true' : 'false');
     rankingLimit.textContent = liveMode ? 'Top 5' : 'Top 10';
 
     let displayRanking;
