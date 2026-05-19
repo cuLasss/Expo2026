@@ -7,13 +7,19 @@ Runner 3D de sessao curta para banca/exposicao do curso de Informatica do IF.
 Na pasta raiz do projeto:
 
 ```powershell
-python if-rush/server.py --port 8765
+npm start
 ```
 
 Abra:
 
 ```text
-http://localhost:8765/if-rush/
+http://127.0.0.1:8765/if-rush/
+```
+
+Para desligar:
+
+```powershell
+npm run stop
 ```
 
 Se rodar com `python -m http.server`, o jogo ainda funciona, mas o ranking fica apenas no `localStorage`.

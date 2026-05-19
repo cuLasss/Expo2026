@@ -5,14 +5,26 @@ Runner 3D de sessao curta para a banca do IF na exposicao agropecuaria.
 ## Rodar local
 
 ```powershell
-python if-rush/server.py --port 8765
+npm start
 ```
 
 Abra:
 
 ```text
-http://localhost:8765/
-http://localhost:8765/if-rush/
+http://127.0.0.1:8765/if-rush/
+```
+
+Para desligar:
+
+```powershell
+npm run stop
+```
+
+Tambem da para chamar os scripts direto:
+
+```powershell
+.\start-if-rush.ps1
+.\stop-if-rush.ps1
 ```
 
 ## Branches

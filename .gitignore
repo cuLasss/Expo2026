@@ -14,6 +14,7 @@ if-rush/sounds/Ambiente/faixa *.mp3
 # Generated/local runtime state
 .env
 .env.*
+.if-rush-server.pid
 
 # Large unused source-pack formats. The project runs from glTF/FBX copies.
 *.blend

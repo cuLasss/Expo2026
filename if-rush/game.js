@@ -76,6 +76,16 @@ const MODEL_ROOT = 'assets/models/';
 const NATURE_ROOT = 'assets/models/nature/glTF/';
 const BUILDING_ROOT = 'assets/models/buildings/FBX/';
 const TEXTURE_ROOT = 'assets/textures/ambientcg/';
+const CAMPUS_NPC_FILES = [
+    'Casual_Male.gltf',
+    'Casual_Female.gltf',
+    'Casual2_Male.gltf',
+    'Casual2_Female.gltf',
+    'Casual3_Male.gltf',
+    'Casual3_Female.gltf',
+    'Worker_Male.gltf',
+    'Worker_Female.gltf',
+];
 const COURSE_TOPICS = [
     { tag: 'WEB', title: 'Desenvolvimento Web', copy: 'Sites e apps que rodam no navegador.', color: 0x2b9cff },
     { tag: 'IA', title: 'Inteligência Artificial', copy: 'Sistemas que aprendem padrões e ajudam pessoas.', color: 0x8f62ff },
@@ -649,6 +659,12 @@ const SCENERY_START_Z = 18;
 const SCENERY_RECYCLE_Z = 24;
 const SCENERY_LOOP_LENGTH = SCENERY_COUNT * SCENERY_SPACING;
 const SCENERY_SPEED_FACTOR = 0.82;
+const CAMPUS_BENCH_SPAWN_CHANCE = 0.52;
+const CAMPUS_BENCH_OCCUPANCY = [
+    { mode: 0, weight: 0.34 },
+    { mode: 1, weight: 0.42 },
+    { mode: 2, weight: 0.24 },
+];
 const RIGHT_UTILITY_POLE_X = 10.72;
 const RIGHT_UTILITY_POLE_ZS = [-17, 0, 17];
 const CLOUD_COUNT = 8;
@@ -1147,6 +1163,11 @@ audioManager.init();
 
 const liveObjects = [];
 const roadSegments = [];
+const TRACK_SEGMENT_COUNT = 8;
+const TRACK_SEGMENT_LENGTH = 34;
+const TRACK_SEGMENT_HALF = TRACK_SEGMENT_LENGTH / 2;
+const TRACK_TOTAL_LENGTH = TRACK_SEGMENT_COUNT * TRACK_SEGMENT_LENGTH;
+const TRACK_RECYCLE_Z = 38;
 const scenery = [];
 const cloudScenery = [];
 const sparks = [];
@@ -1159,6 +1180,7 @@ const loaderFBX = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 const gameAssets = {
     player: null,
+    npcs: [],
     trees: [],
     bushes: [],
     rocks: [],
@@ -1179,6 +1201,20 @@ function loadFBXAsset(url) {
 
 function normalizeIndex(value, length) {
     return ((value % length) + length) % length;
+}
+
+function pickRandom(list) {
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+function pickWeighted(list, key = 'mode') {
+    const total = list.reduce((sum, item) => sum + item.weight, 0);
+    let cursor = Math.random() * total;
+    for (const item of list) {
+        cursor -= item.weight;
+        if (cursor <= 0) return item[key];
+    }
+    return list[list.length - 1]?.[key];
 }
 
 function loadCustomizeState() {
@@ -1400,11 +1436,15 @@ function styleImportedBuilding(root, palette) {
 
 async function loadGameAssets() {
     const initialCharacter = getCurrentCharacter().file;
-    const [playerResult, buildingResults] = await Promise.all([
+    const [playerResult, npcResults, buildingResults] = await Promise.all([
         loadCharacterAsset(initialCharacter).catch(err => {
             console.warn('[IF Rush] Player GLTF falhou, usando fallback procedural:', err);
             return null;
         }),
+        Promise.all(CAMPUS_NPC_FILES.map(file => loadCharacterAsset(file).catch(err => {
+            console.warn('[IF Rush] NPC GLTF falhou:', file, err);
+            return null;
+        }))),
         Promise.all([
             '1Story_GableRoof.fbx',
             '2Story_Wide.fbx',
@@ -1417,6 +1457,7 @@ async function loadGameAssets() {
     ]);
 
     gameAssets.player = playerResult;
+    gameAssets.npcs = npcResults.filter(Boolean);
     gameAssets.trees = [];
     gameAssets.bushes = [];
     gameAssets.rocks = [];
@@ -1427,16 +1468,45 @@ hudBest.textContent = String(bestScore);
 
 const treeBarkMap = makeNoiseTexture('#a37446', '#6c4328', 70, 512);
 const treeLeafMap = makeNoiseTexture('#39c970', '#1d994e', 75, 512);
-const stylizedGrassMap = makeLowPolyPatchTexture('#77c649', '#599d34', '#9cdf70', 10, 24, 768, 160);
+const stylizedGrassMap = makeLowPolyPatchTexture('#4f8f38', '#2f5f2a', '#78b95a', 10, 24, 768, 190);
+const utilityPoleMap = makeNoiseTexture('#5f4732', '#2f291f', 74, 512);
+const asphaltMap = makeRoadTexture();
+const asphaltBumpMap = makeRoadBumpTexture();
 
 const mats = {
-    road: new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.96 }),
-    sidewalk: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeTileTexture('#f4dfc7', '#d3b89a'), roughness: 0.98 }),
-    grass: new THREE.MeshStandardMaterial({ color: 0xffffff, map: stylizedGrassMap, roughness: 0.99 }),
+    road: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: asphaltMap,
+        bumpMap: asphaltBumpMap,
+        bumpScale: 0.045,
+        roughness: 0.99,
+        metalness: 0.0,
+    }),
+    roadPaint: new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        map: makeRoadPaintTexture(),
+        transparent: true,
+        opacity: 0.96,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+    }),
+    roadEdgeLine: new THREE.MeshBasicMaterial({
+        color: 0xf4efe1,
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+    }),
+    sidewalk: new THREE.MeshStandardMaterial({ color: 0xf1eee4, map: makeTileTexture('#d8d0bf', '#aaa18d'), roughness: 0.98 }),
+    grass: new THREE.MeshStandardMaterial({ color: 0xe1ecd7, map: stylizedGrassMap, roughness: 0.99 }),
     buildingWall: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeBuildingWallTexture(), roughness: 0.98 }),
     roof: new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeRoofTexture(), roughness: 0.95 }),
     concrete: new THREE.MeshStandardMaterial({ color: 0xf7efe1, map: makeTileTexture('#f3e5cf', '#d8bea0'), roughness: 0.98 }),
-    curb: new THREE.MeshStandardMaterial({ color: 0xfffaf0, map: makeTileTexture('#f3e5cf', '#d8bea0'), roughness: 0.98 }),
+    curb: new THREE.MeshStandardMaterial({ color: 0xe0ddcf, map: makeTileTexture('#c9c3b2', '#9ba08f'), roughness: 0.98 }),
     glass: new THREE.MeshStandardMaterial({ color: 0xd4dee5, roughness: 0.28, metalness: 0.01, transparent: true, opacity: 0.92 }),
     white: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }),
     black: new THREE.MeshStandardMaterial({ color: 0x172033, roughness: 0.62 }),
@@ -1493,13 +1563,13 @@ function roundedRect(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
-function finishTexture(canvas, repeatX = 1, repeatY = 1) {
+function finishTexture(canvas, repeatX = 1, repeatY = 1, useColorSpace = true) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeatX, repeatY);
     tex.anisotropy = maxAnisotropy;
-    tex.colorSpace = THREE.SRGBColorSpace;
+    if (useColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
 }
 
@@ -1539,10 +1609,10 @@ function makeLowPolyPatchTexture(
         ctx.fill();
     }
 
-    ctx.globalAlpha = 0.16;
+    ctx.globalAlpha = 0.11;
     const grad = ctx.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, 'rgba(255,255,255,0.22)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+    grad.addColorStop(0, 'rgba(255,255,255,0.14)');
+    grad.addColorStop(1, 'rgba(10,28,22,0.2)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
     ctx.globalAlpha = 1;
@@ -1555,31 +1625,78 @@ function makeRoadTexture() {
     canvas.width = 1024;
     canvas.height = 2048;
     const ctx = canvas.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    grad.addColorStop(0, '#4f5a65');
-    grad.addColorStop(0.38, '#68727e');
-    grad.addColorStop(0.72, '#59636e');
-    grad.addColorStop(1, '#464f59');
-    ctx.fillStyle = grad;
+
+    const base = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    base.addColorStop(0, '#1b2026');
+    base.addColorStop(0.18, '#28303a');
+    base.addColorStop(0.5, '#303843');
+    base.addColorStop(0.82, '#252c35');
+    base.addColorStop(1, '#171c22');
+    ctx.fillStyle = base;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.globalAlpha = 0.09;
-    for (let i = 0; i < 720; i++) {
-        const x = (i * 73) % canvas.width;
-        const y = (i * 131) % canvas.height;
-        const shade = i % 5 ? '#ffffff' : '#223241';
+    const laneLight = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    laneLight.addColorStop(0, 'rgba(0, 0, 0, 0.24)');
+    laneLight.addColorStop(0.18, 'rgba(255, 255, 255, 0.035)');
+    laneLight.addColorStop(0.5, 'rgba(255, 255, 255, 0.065)');
+    laneLight.addColorStop(0.82, 'rgba(255, 255, 255, 0.025)');
+    laneLight.addColorStop(1, 'rgba(0, 0, 0, 0.28)');
+    ctx.fillStyle = laneLight;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 4400; i++) {
+        const x = (i * 61 + (i % 17) * 19) % canvas.width;
+        const y = (i * 137 + (i % 23) * 29) % canvas.height;
+        const shade = i % 7 === 0 ? '#0c1015' : i % 3 === 0 ? '#69717a' : '#3c444d';
         ctx.fillStyle = shade;
-        ctx.fillRect(x, y, 5 + (i % 13), 1 + (i % 2));
+        const w = 1 + (i % 7);
+        const h = 1 + (i % 3);
+        ctx.fillRect(x, y, w, h);
+        if (y < 16) ctx.fillRect(x, y + canvas.height, w, h);
+        if (y > canvas.height - 16) ctx.fillRect(x, y - canvas.height, w, h);
     }
     ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.globalAlpha = 0.18;
+    for (const u of [0.19, 0.24, 0.48, 0.53, 0.76, 0.81]) {
+        const x = canvas.width * u;
+        const band = ctx.createLinearGradient(x - 34, 0, x + 34, 0);
+        band.addColorStop(0, 'rgba(0,0,0,0)');
+        band.addColorStop(0.45, 'rgba(0,0,0,0.34)');
+        band.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = band;
+        ctx.fillRect(x - 34, 0, 68, canvas.height);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 56; i++) {
+        const x = (i * 173) % canvas.width;
+        const y = (i * 311) % canvas.height;
+        const length = 18 + (i % 9) * 10;
+        ctx.strokeStyle = i % 3 === 0 ? 'rgba(8, 12, 16, 0.28)' : 'rgba(126, 135, 143, 0.14)';
+        ctx.lineWidth = 1 + (i % 3);
+        for (const offsetY of [0, -canvas.height, canvas.height]) {
+            const yy = y + offsetY;
+            if (yy > canvas.height + length || yy < -length) continue;
+            ctx.beginPath();
+            ctx.moveTo(x, yy);
+            ctx.quadraticCurveTo(x + 12 - (i % 5) * 6, yy + length * 0.45, x + 4 - (i % 7) * 3, yy + length);
+            ctx.stroke();
+        }
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
     ctx.lineWidth = 2;
-    for (let y = 0; y < canvas.height; y += 92) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.bezierCurveTo(240, y + 12, 680, y - 10, canvas.width, y + 4);
-        ctx.stroke();
+    for (let y = 0; y < canvas.height; y += 112) {
+        for (const yy of [y, y - canvas.height, y + canvas.height]) {
+            if (yy > canvas.height + 16 || yy < -16) continue;
+            ctx.beginPath();
+            ctx.moveTo(0, yy);
+            ctx.bezierCurveTo(260, yy + 9, 690, yy - 12, canvas.width, yy + 5);
+            ctx.stroke();
+        }
     }
 
     return finishTexture(canvas, 1, 1);
@@ -1590,14 +1707,55 @@ function makeRoadBumpTexture() {
     canvas.width = 1024;
     canvas.height = 2048;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#858585';
+    ctx.fillStyle = '#707070';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 0.36;
-    for (let i = 0; i < 3600; i++) {
-        const shade = 92 + (i % 9) * 8;
+    ctx.globalAlpha = 0.42;
+    for (let i = 0; i < 5200; i++) {
+        const shade = 82 + (i % 11) * 7;
         ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-        ctx.fillRect((i * 59) % canvas.width, (i * 113) % canvas.height, 2 + (i % 6), 1 + (i % 4));
+        ctx.fillRect((i * 59) % canvas.width, (i * 113) % canvas.height, 1 + (i % 6), 1 + (i % 3));
     }
+    ctx.globalAlpha = 1;
+    return finishTexture(canvas, 1, 1, false);
+}
+
+function makeRoadPaintTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 192;
+    canvas.height = 768;
+    const ctx = canvas.getContext('2d');
+
+    const paint = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    paint.addColorStop(0, '#ffe36a');
+    paint.addColorStop(0.48, '#f4bd2c');
+    paint.addColorStop(1, '#c98a16');
+    ctx.fillStyle = paint;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.globalAlpha = 0.28;
+    for (let i = 0; i < 180; i++) {
+        const x = (i * 37) % canvas.width;
+        const y = (i * 83) % canvas.height;
+        ctx.fillStyle = i % 4 === 0 ? '#7d5812' : '#fff4a3';
+        ctx.fillRect(x, y, 1 + (i % 8), 1 + (i % 4));
+    }
+
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = 0.2;
+    for (let i = 0; i < 74; i++) {
+        const x = (i * 53) % canvas.width;
+        const y = (i * 127) % canvas.height;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4 + (i % 10), 1 + (i % 4), (i % 6) * 0.46, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = 'rgba(116, 76, 8, 0.22)';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+
     return finishTexture(canvas, 1, 1);
 }
 
@@ -2204,18 +2362,20 @@ function makeCoinFaceTexture(mark = 'IF', bg = '#ffc94a', fg = '#fff8dc') {
 }
 
 function addRoadMarkings(segment) {
-    const dashMat = new THREE.MeshBasicMaterial({ color: 0xfff6d2, transparent: true, opacity: 0.92 });
-    const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.82 });
+    const dashLength = 3.55;
+    const dashMargin = dashLength * 0.5 + 0.45;
+    const firstDashZ = -TRACK_SEGMENT_HALF + dashMargin;
+    const lastDashZ = TRACK_SEGMENT_HALF - dashMargin;
     for (const x of [-2.1, 2.1]) {
-        for (let z = -16; z <= 18; z += 7.2) {
-            const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 3.35), dashMat);
+        for (let z = firstDashZ; z <= lastDashZ; z += 7.2) {
+            const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.24, dashLength), mats.roadPaint);
             dash.rotation.x = -Math.PI / 2;
             dash.position.set(x, 0.045, z);
             segment.add(dash);
         }
     }
     for (const x of [-6.95, 6.95]) {
-        const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 35.5), edgeMat);
+        const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.14, TRACK_SEGMENT_LENGTH - 0.12), mats.roadEdgeLine);
         edge.rotation.x = -Math.PI / 2;
         edge.position.set(x, 0.046, 0);
         segment.add(edge);
@@ -2246,36 +2406,64 @@ function addMovingSideHills(segment, segmentIndex) {
 }
 
 function addRightUtilityPoles(segment) {
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x5d3a20, flatShading: true, roughness: 0.86 });
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0x171b1f, roughness: 0.62 });
-    const insulatorMat = new THREE.MeshStandardMaterial({ color: 0xd8f6ef, flatShading: true, roughness: 0.5 });
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0xd6b78d, map: utilityPoleMap, flatShading: true, roughness: 0.9 });
+    const poleDarkMat = new THREE.MeshStandardMaterial({ color: 0x2b241d, flatShading: true, roughness: 0.86 });
+    const braceMat = new THREE.MeshStandardMaterial({ color: 0x35312b, flatShading: true, roughness: 0.72, metalness: 0.04 });
+    const wireMat = new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.66 });
+    const insulatorMat = new THREE.MeshStandardMaterial({ color: 0xd8e4d6, flatShading: true, roughness: 0.48 });
     const x = RIGHT_UTILITY_POLE_X;
-    const wireOffsets = [-0.48, 0.48];
+    const wirePoints = [
+        { offset: 0.26, y: 3.48 },
+        { offset: 0.58, y: 3.3 },
+    ];
 
     for (const z of RIGHT_UTILITY_POLE_ZS) {
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 3.7, 6), poleMat);
-        pole.position.set(x, 1.85, z);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.18, 3.85, 7), poleMat);
+        pole.position.set(x, 1.925, z);
         pole.castShadow = true;
+        pole.receiveShadow = true;
         segment.add(pole);
 
-        const crossbar = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.15, 0.13), poleMat);
-        crossbar.position.set(x, 3.42, z);
-        crossbar.castShadow = true;
-        segment.add(crossbar);
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.32, 7), poleDarkMat);
+        base.position.set(x, 0.16, z);
+        base.castShadow = true;
+        segment.add(base);
 
-        for (const offset of wireOffsets) {
-            const cap = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11, 0), insulatorMat);
-            cap.position.set(x + offset, 3.54, z);
+        const topCap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.16, 7), poleDarkMat);
+        topCap.position.set(x, 3.92, z);
+        topCap.castShadow = true;
+        segment.add(topCap);
+
+        for (const y of [0.74, 2.42, 3.58]) {
+            const band = new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.136, 0.055, 7), braceMat);
+            band.position.set(x, y, z);
+            band.scale.z = 0.76;
+            band.castShadow = true;
+            segment.add(band);
+        }
+
+        for (const { offset, y } of wirePoints) {
+            const pegStart = new THREE.Vector3(x + 0.06, y, z);
+            const pegEnd = new THREE.Vector3(x + offset, y + 0.02, z);
+            segment.add(makeCylinderBetween(pegStart, pegEnd, 0.035, braceMat, 6));
+
+            const supportStart = new THREE.Vector3(x + 0.08, y - 0.34, z);
+            const supportEnd = new THREE.Vector3(x + offset * 0.86, y - 0.02, z);
+            segment.add(makeCylinderBetween(supportStart, supportEnd, 0.024, braceMat, 5));
+
+            const cap = new THREE.Mesh(new THREE.DodecahedronGeometry(0.105, 0), insulatorMat);
+            cap.position.set(x + offset, y + 0.02, z);
+            cap.scale.set(1.0, 0.82, 1.0);
             cap.castShadow = true;
             segment.add(cap);
         }
     }
 
-    for (const offset of wireOffsets) {
+    for (const { offset, y } of wirePoints) {
         for (let i = 0; i < RIGHT_UTILITY_POLE_ZS.length - 1; i++) {
-            const start = new THREE.Vector3(x + offset, 3.54, RIGHT_UTILITY_POLE_ZS[i]);
-            const mid = new THREE.Vector3(x + offset, 3.38, (RIGHT_UTILITY_POLE_ZS[i] + RIGHT_UTILITY_POLE_ZS[i + 1]) * 0.5);
-            const end = new THREE.Vector3(x + offset, 3.54, RIGHT_UTILITY_POLE_ZS[i + 1]);
+            const start = new THREE.Vector3(x + offset, y + 0.02, RIGHT_UTILITY_POLE_ZS[i]);
+            const mid = new THREE.Vector3(x + offset, y - 0.12, (RIGHT_UTILITY_POLE_ZS[i] + RIGHT_UTILITY_POLE_ZS[i + 1]) * 0.5);
+            const end = new THREE.Vector3(x + offset, y + 0.02, RIGHT_UTILITY_POLE_ZS[i + 1]);
             segment.add(makeCylinderBetween(start, mid, 0.024, wireMat, 6));
             segment.add(makeCylinderBetween(mid, end, 0.024, wireMat, 6));
         }
@@ -2283,17 +2471,17 @@ function addRightUtilityPoles(segment) {
 }
 
 function createTrack() {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < TRACK_SEGMENT_COUNT; i++) {
         const segment = new THREE.Group();
-        const z = -i * 34;
+        const z = -i * TRACK_SEGMENT_LENGTH;
 
-        const grass = new THREE.Mesh(new THREE.PlaneGeometry(150, 36), mats.grass);
+        const grass = new THREE.Mesh(new THREE.PlaneGeometry(150, TRACK_SEGMENT_LENGTH), mats.grass);
         grass.rotation.x = -Math.PI / 2;
         grass.position.y = -0.035;
         grass.receiveShadow = true;
         segment.add(grass);
 
-        const road = new THREE.Mesh(new THREE.PlaneGeometry(14.7, 36), mats.road);
+        const road = new THREE.Mesh(new THREE.PlaneGeometry(14.7, TRACK_SEGMENT_LENGTH), mats.road);
         road.rotation.x = -Math.PI / 2;
         road.position.y = 0.012;
         road.receiveShadow = true;
@@ -2303,13 +2491,13 @@ function createTrack() {
         addMovingSideHills(segment, i);
 
         [-9.3, 9.3].forEach(x => {
-            const walk = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 36), mats.sidewalk);
+            const walk = new THREE.Mesh(new THREE.PlaneGeometry(3.2, TRACK_SEGMENT_LENGTH), mats.sidewalk);
             walk.rotation.x = -Math.PI / 2;
             walk.position.set(x, 0.025, 0);
             walk.receiveShadow = true;
             segment.add(walk);
 
-            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 36), mats.curb);
+            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, TRACK_SEGMENT_LENGTH), mats.curb);
             curb.position.set(x > 0 ? 7.62 : -7.62, 0.12, 0);
             curb.castShadow = true;
             segment.add(curb);
@@ -2374,25 +2562,27 @@ function makeCylinderBetween(start, end, radius, material, radialSegments = 8) {
     return mesh;
 }
 
-function createSidewalkBench(side = 1) {
+function createSidewalkBench(side = 1, { length = 1.72 } = {}) {
     const group = new THREE.Group();
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, flatShading: true, roughness: 0.74 });
     const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x5c351e, flatShading: true, roughness: 0.82 });
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x20262b, flatShading: true, roughness: 0.58, metalness: 0.08 });
+    const halfLength = length / 2;
 
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.16, 1.72), woodMat);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.16, length), woodMat);
     seat.position.set(0, 0.55, 0);
     seat.castShadow = true;
     seat.receiveShadow = true;
     group.add(seat);
 
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 1.76), darkWoodMat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, length + 0.04), darkWoodMat);
     back.position.set(0.34, 0.86, 0);
     back.rotation.z = -0.08;
     back.castShadow = true;
     group.add(back);
 
-    for (const z of [-0.62, 0.62]) {
+    const legSlots = length > 2.1 ? [-halfLength + 0.38, 0, halfLength - 0.38] : [-halfLength + 0.32, halfLength - 0.32];
+    for (const z of legSlots) {
         const legA = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.58, 0.12), metalMat);
         legA.position.set(-0.18, 0.27, z);
         legA.castShadow = true;
@@ -2404,7 +2594,7 @@ function createSidewalkBench(side = 1) {
         group.add(legB);
     }
 
-    for (const z of [-0.9, 0.9]) {
+    for (const z of [-halfLength - 0.08, halfLength + 0.08]) {
         const arm = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.09, 0.1), metalMat);
         arm.position.set(0.04, 0.76, z);
         arm.castShadow = true;
@@ -2412,6 +2602,175 @@ function createSidewalkBench(side = 1) {
     }
 
     group.rotation.y = side > 0 ? 0 : Math.PI;
+    return group;
+}
+
+function randomizeNpcColors(root) {
+    tintCascade(root, MATERIAL_TARGETS.skin, pickRandom(PRESETS.skin).color);
+    tintCascade(root, MATERIAL_TARGETS.hair, pickRandom(PRESETS.hair).color);
+    tintCascade(root, MATERIAL_TARGETS.eyebrow, pickRandom(PRESETS.eyebrow).color);
+    tintCascade(root, MATERIAL_TARGETS.shirt, pickRandom(PRESETS.shirt).color);
+    tintCascade(root, MATERIAL_TARGETS.pants, pickRandom(PRESETS.pants).color);
+}
+
+function cloneCampusNpcModel(asset) {
+    if (!asset?.scene) return null;
+    const root = SkeletonUtils.clone(asset.scene);
+    enableModelShadows(root);
+    fitObjectToBox(root, { height: 2.35 });
+    root.rotation.y = Math.PI;
+    root.userData.basePosition = root.position.clone();
+    root.userData.baseRotation = root.rotation.clone();
+    randomizeNpcColors(root);
+    return root;
+}
+
+function findNpcClip(asset, names) {
+    if (!asset?.animations?.length) return null;
+    return names.map(name => asset.animations.find(clip => clip.name === name)).find(Boolean)
+        || asset.animations.find(clip => clip.name === 'Idle')
+        || asset.animations[0];
+}
+
+function createReadingBook() {
+    const group = new THREE.Group();
+    const coverMat = new THREE.MeshStandardMaterial({ color: 0x1f8a45, roughness: 0.68, metalness: 0.01 });
+    const pageMat = new THREE.MeshStandardMaterial({ color: 0xfff5d8, roughness: 0.82 });
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0x7d725f, transparent: true, opacity: 0.42 });
+
+    const cover = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.035, 0.42), coverMat);
+    cover.castShadow = true;
+    group.add(cover);
+
+    for (const x of [-0.15, 0.15]) {
+        const page = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.026, 0.36), pageMat);
+        page.position.set(x, 0.024, 0);
+        page.rotation.z = x < 0 ? 0.1 : -0.1;
+        page.castShadow = true;
+        group.add(page);
+
+        for (let i = 0; i < 3; i++) {
+            const line = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.006, 0.012), lineMat);
+            line.position.set(x, 0.043, -0.1 + i * 0.09);
+            group.add(line);
+        }
+    }
+
+    group.position.set(0, 1.34, -0.34);
+    group.rotation.x = -0.58;
+    return group;
+}
+
+function createCampusNpc(actionType = 'idle') {
+    const assets = gameAssets.npcs?.length ? gameAssets.npcs : [gameAssets.player].filter(Boolean);
+    const asset = pickRandom(assets);
+    const root = cloneCampusNpcModel(asset);
+    if (!root) return null;
+
+    const group = new THREE.Group();
+    group.add(root);
+
+    const mixer = new THREE.AnimationMixer(root);
+    const clipNames = {
+        sit: ['SitDown', 'Idle'],
+        read: ['SitDown', 'Idle'],
+        run: ['Run', 'Walk', 'Idle'],
+        walk: ['Walk', 'Idle'],
+        chat: Math.random() > 0.5 ? ['Victory', 'PickUp', 'Idle'] : ['Idle'],
+        idle: ['Idle'],
+    }[actionType] || ['Idle'];
+    const clip = findNpcClip(asset, clipNames);
+    let pausedPose = false;
+    if (clip) {
+        const action = mixer.clipAction(clip);
+        if ((actionType === 'sit' || actionType === 'read') && clip.name === 'SitDown') {
+            action.setLoop(THREE.LoopOnce, 1);
+            action.clampWhenFinished = true;
+            action.play();
+            mixer.setTime(clip.duration * 0.86);
+            action.paused = true;
+            pausedPose = true;
+        } else {
+            action.setLoop(THREE.LoopRepeat, Infinity);
+            action.timeScale = actionType === 'run' ? 0.72 + Math.random() * 0.24 : 0.72 + Math.random() * 0.18;
+            action.play();
+            action.time = Math.random() * clip.duration;
+        }
+    }
+
+    const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.52, 22),
+        new THREE.MeshBasicMaterial({ color: 0x07100b, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.018;
+    group.add(shadow);
+
+    group.userData.campusNpc = {
+        mixer,
+        pausedPose,
+        mode: actionType,
+        animationSpeed: 0.82 + Math.random() * 0.28,
+        phase: Math.random() * Math.PI * 2,
+        baseY: group.position.y,
+        baseZ: group.position.z,
+        baseRotationY: group.rotation.y,
+        patrolRange: actionType === 'run' ? 4.2 + Math.random() * 1.4 : 2.8 + Math.random() * 0.9,
+        patrolOffset: 0,
+        patrolDirection: Math.random() > 0.5 ? 1 : -1,
+        patrolSpeed: actionType === 'run' ? 2.35 + Math.random() * 0.55 : 0.95 + Math.random() * 0.32,
+    };
+
+    return group;
+}
+
+function createBenchPassenger(side, slotZ, { reading = false } = {}) {
+    const npc = createCampusNpc(reading ? 'read' : 'sit');
+    if (!npc) return null;
+
+    npc.position.set(-side * 0.1, 0.5, slotZ);
+    npc.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+    npc.scale.setScalar(0.9 + Math.random() * 0.05);
+
+    const data = npc.userData.campusNpc;
+    data.baseRotationY = npc.rotation.y;
+    data.seatLean = (Math.random() - 0.5) * 0.018;
+    if (reading) {
+        const book = createReadingBook();
+        npc.add(book);
+        data.book = book;
+    }
+
+    return npc;
+}
+
+function createCampusBenchScene(side = 1) {
+    if (!gameAssets.npcs?.length && !gameAssets.player) return null;
+
+    const occupants = pickWeighted(CAMPUS_BENCH_OCCUPANCY);
+    const length = occupants >= 2 ? 2.52 + Math.random() * 0.18 : 1.8 + Math.random() * 0.2;
+    const group = new THREE.Group();
+    group.userData.campusNpcs = [];
+    group.position.set(side * (9.08 + Math.random() * 0.42), 0, -16 + Math.random() * 13);
+
+    const bench = createSidewalkBench(side, { length });
+    bench.scale.multiplyScalar(0.94 + Math.random() * 0.1);
+    group.add(bench);
+
+    const seats = occupants === 2
+        ? [-length * 0.22, length * 0.22]
+        : occupants === 1
+            ? [(Math.random() - 0.5) * length * 0.32]
+            : [];
+
+    seats.forEach((slotZ, index) => {
+        const npc = createBenchPassenger(side, slotZ, { reading: Math.random() > (occupants === 2 && index === 1 ? 0.72 : 0.52) });
+        if (!npc) return;
+        group.add(npc);
+        group.userData.campusNpcs.push(npc);
+    });
+
+    group.rotation.y += (Math.random() - 0.5) * 0.035;
     return group;
 }
 
@@ -2952,13 +3311,16 @@ function addSceneryCluster(z) {
             group.add(rock);
         }
 
-        if (Math.random() > 0.62) {
-            const bench = createSidewalkBench(side);
-            bench.position.set(side * (9.15 + Math.random() * 0.45), 0, -16 + Math.random() * 13);
-            bench.rotation.y += (Math.random() - 0.5) * 0.06;
-            bench.scale.multiplyScalar(0.9 + Math.random() * 0.16);
-            registerGroundSpawn(bench);
-            group.add(bench);
+        if (Math.random() < CAMPUS_BENCH_SPAWN_CHANCE) {
+            const benchScene = createCampusBenchScene(side);
+            if (benchScene) {
+                registerGroundSpawn(benchScene);
+                group.userData.campusNpcs = [
+                    ...(group.userData.campusNpcs || []),
+                    ...(benchScene.userData.campusNpcs || []),
+                ];
+                group.add(benchScene);
+            }
         }
 
     }
@@ -5480,7 +5842,7 @@ function finishGroundSpawn(group) {
 
 function resetVisualWorldLoops() {
     roadSegments.forEach((segment, index) => {
-        segment.position.z = -index * 34;
+        segment.position.z = -index * TRACK_SEGMENT_LENGTH;
     });
     scenery.forEach((group, index) => {
         group.position.z = SCENERY_START_Z - index * SCENERY_SPACING;
@@ -6960,7 +7322,7 @@ function updateRunning(delta, t) {
 
     for (const segment of roadSegments) {
         segment.position.z += speed * delta;
-        if (segment.position.z > 38) segment.position.z -= roadSegments.length * 34;
+        if (segment.position.z > TRACK_RECYCLE_Z) segment.position.z -= TRACK_TOTAL_LENGTH;
     }
 
     for (const obj of liveObjects) {
@@ -7054,7 +7416,49 @@ function updateRunning(delta, t) {
     }
 }
 
+function updateCampusLife(group, delta, t) {
+    for (const npc of group.userData.campusNpcs || []) {
+        const data = npc.userData.campusNpc;
+        if (!data) continue;
+        if (data.mixer && !data.pausedPose) data.mixer.update(delta * data.animationSpeed);
+
+        if (data.mode === 'run' || data.mode === 'walk') {
+            data.patrolOffset += data.patrolDirection * data.patrolSpeed * delta;
+            if (Math.abs(data.patrolOffset) > data.patrolRange) {
+                data.patrolOffset = Math.sign(data.patrolOffset) * data.patrolRange;
+                data.patrolDirection *= -1;
+            }
+            const stepPhase = t * (data.mode === 'run' ? 12.4 : 6.2) + data.phase;
+            npc.position.z = data.baseZ + data.patrolOffset;
+            npc.position.y = data.baseY + Math.abs(Math.sin(stepPhase)) * (data.mode === 'run' ? 0.052 : 0.022);
+            npc.rotation.y = data.baseRotationY + (data.patrolDirection < 0 ? Math.PI : 0);
+        } else if (data.mode === 'chat') {
+            const breathe = Math.sin(t * 2.2 + data.phase) * 0.018;
+            npc.position.y = data.baseY + breathe;
+            npc.rotation.y = data.baseRotationY + Math.sin(t * 1.15 + data.phase) * 0.12;
+            npc.rotation.z = Math.sin(t * 1.7 + data.phase) * 0.024;
+            npc.rotation.x = Math.sin(t * 2.6 + data.phase) * 0.035;
+        } else if (data.mode === 'read' || data.mode === 'sit') {
+            npc.rotation.y = data.baseRotationY + Math.sin(t * 0.9 + data.phase) * 0.035;
+            npc.rotation.z = data.seatLean + Math.sin(t * 1.3 + data.phase) * 0.01;
+            npc.rotation.x = Math.sin(t * 1.8 + data.phase) * 0.018;
+            if (data.book) {
+                data.book.position.y = 1.34 + Math.sin(t * 2.1 + data.phase) * 0.018;
+                data.book.rotation.z = Math.sin(t * 1.6 + data.phase) * 0.035;
+            }
+        }
+    }
+
+    for (const dots of group.userData.chatDots || []) {
+        dots.position.y = 2.42 + Math.sin(t * 2.5 + dots.id * 0.1) * 0.035;
+        dots.userData.dots?.forEach((dot, index) => {
+            dot.scale.setScalar(0.84 + Math.abs(Math.sin(t * 4.2 + index * 0.8)) * 0.28);
+        });
+    }
+}
+
 function updateScenery(delta, currentSpeed = speed) {
+    const t = clock.elapsedTime;
     for (const group of scenery) {
         group.position.z += currentSpeed * SCENERY_SPEED_FACTOR * delta;
         if (group.position.z > SCENERY_RECYCLE_Z) {
@@ -7062,6 +7466,7 @@ function updateScenery(delta, currentSpeed = speed) {
             resetGroundSpawn(group);
         }
         updateGroundSpawn(group, delta);
+        updateCampusLife(group, delta, t);
     }
 }
 
@@ -7138,7 +7543,7 @@ function animate() {
     for (const segment of roadSegments) {
         if (state !== 'running' && visualSpeed > 0) {
             segment.position.z += visualSpeed * delta;
-            if (segment.position.z > 38) segment.position.z -= roadSegments.length * 34;
+            if (segment.position.z > TRACK_RECYCLE_Z) segment.position.z -= TRACK_TOTAL_LENGTH;
         }
     }
 

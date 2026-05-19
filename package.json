@@ -1,6 +1,10 @@
 {
   "name": "if-rush-netlify",
   "private": true,
+  "scripts": {
+    "start": "powershell -ExecutionPolicy Bypass -File ./start-if-rush.ps1",
+    "stop": "powershell -ExecutionPolicy Bypass -File ./stop-if-rush.ps1"
+  },
   "dependencies": {
     "@netlify/blobs": "^10.7.8"
   }
