@@ -105,6 +105,10 @@ button {
     opacity: 0.46;
 }
 
+.ranking-editor-toggle[hidden] {
+    display: none !important;
+}
+
 #game-shell[data-state="menu"] .ranking-editor-toggle {
     display: grid;
 }

@@ -1,5 +1,6 @@
 # Local tooling and caches
 .claude/
+node_modules/
 test-results/
 if-rush/screenshots/
 if-rush/__pycache__/

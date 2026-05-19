@@ -29,6 +29,7 @@ const btnConfirmRetry = document.getElementById('btn-confirm-retry');
 const btnCancelRetry = document.getElementById('btn-cancel-retry');
 const rankingPanel = document.getElementById('ranking-panel');
 const rankingList = document.getElementById('ranking-list');
+const rankingTitle = rankingPanel.querySelector('.ranking-head h2');
 const rankingLimit = rankingPanel.querySelector('.ranking-head span');
 const rankingEditorToggle = document.getElementById('ranking-editor-toggle');
 const musicPlayer = document.getElementById('music-player');
@@ -66,7 +67,8 @@ const customizeRows = {
 };
 
 const STORAGE_KEY = 'if-rush-ranking-v1';
-const RANKING_ENDPOINT = 'ranking.json';
+const ONLINE_RANKING_ENDPOINT = '/api/ranking';
+const LOCAL_RANKING_ENDPOINT = 'ranking.json';
 const CUSTOMIZE_KEY = 'if-rush-customize-v1';
 const MAP_CUSTOMIZE_KEY = 'if-mapa3d-customize-v3';
 const LANES = [-4.2, 0, 4.2];
@@ -630,7 +632,7 @@ let currentRunRank = null;
 let rankingEditorEnabled = false;
 const activeKeys = new Set();
 let rankingCache = getStoredRanking();
-let rankingUsesJson = false;
+let rankingSource = 'local';
 let bestScore = rankingCache[0]?.score || 0;
 let topicCounts = Object.fromEntries(COURSE_TOPICS.map(topic => [topic.tag, 0]));
 let customIndex = loadCustomizeState();
@@ -1462,7 +1464,7 @@ for (let i = 0; i < CLOUD_COUNT; i++) {
     addCloudCluster(CLOUD_START_Z + i * CLOUD_SPACING, i);
 }
 scene.add(createInstitute());
-await syncRankingFromJson();
+await syncRanking();
 renderRanking();
 updateCharacterSelection();
 updatePauseUi();
@@ -7426,6 +7428,7 @@ rankingList.addEventListener('click', event => {
 });
 rankingEditorToggle.addEventListener('click', () => {
     if (state === 'running' || state === 'paused' || state === 'quiz') return;
+    if (rankingSource === 'online') return;
     rankingEditorEnabled = !rankingEditorEnabled;
     renderRanking();
 });
@@ -7536,8 +7539,9 @@ function getRanking() {
     return rankingCache;
 }
 
-function setRanking(nextRanking) {
+function setRanking(nextRanking, options = {}) {
     rankingCache = normalizeRanking(nextRanking);
+    rankingSource = options.source || rankingSource || 'local';
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(rankingCache));
     } catch { }
@@ -7545,53 +7549,68 @@ function setRanking(nextRanking) {
     hudBest.textContent = String(bestScore);
 }
 
-async function syncRankingFromJson() {
+async function syncRankingFromEndpoint(endpoint, source) {
     try {
-        const response = await fetch(`${RANKING_ENDPOINT}?v=${Date.now()}`, { cache: 'no-store' });
-        if (!response.ok) return;
+        const url = endpoint.includes('?') ? endpoint : `${endpoint}?v=${Date.now()}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) return false;
         const payload = await response.json();
-        rankingUsesJson = true;
-        const jsonRanking = normalizeRanking(payload);
-        setRanking(jsonRanking);
+        setRanking(payload, { source });
+        return true;
     } catch {
-        rankingUsesJson = false;
+        return false;
     }
 }
 
-async function persistRankingToJson() {
+async function syncRanking() {
+    if (await syncRankingFromEndpoint(ONLINE_RANKING_ENDPOINT, 'online')) return;
+    if (await syncRankingFromEndpoint(LOCAL_RANKING_ENDPOINT, 'local')) return;
+    rankingSource = 'local';
+}
+
+async function persistRankingOnline(entry) {
     try {
-        const response = await fetch(RANKING_ENDPOINT, {
+        const response = await fetch(ONLINE_RANKING_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ranking: rankingCache }, null, 2),
+            body: JSON.stringify(entry),
         });
-        rankingUsesJson = response.ok;
+        if (!response.ok) return false;
+        const payload = await response.json();
+        setRanking(payload, { source: 'online' });
+        return true;
     } catch {
-        rankingUsesJson = false;
+        return false;
     }
 }
 
 async function saveScore(entry) {
-    setRanking([...rankingCache, entry]);
-    await persistRankingToJson();
+    const savedOnline = await persistRankingOnline(entry);
+    if (!savedOnline) {
+        setRanking([...rankingCache, entry], { source: 'local' });
+    }
 }
 
 async function deleteRankingEntry(index) {
     if (!rankingEditorEnabled || state === 'running' || state === 'paused' || state === 'quiz') return;
+    if (rankingSource === 'online') return;
     if (index < 0 || index >= rankingCache.length) return;
-    setRanking(rankingCache.filter((_, itemIndex) => itemIndex !== index));
-    await persistRankingToJson();
+    setRanking(rankingCache.filter((_, itemIndex) => itemIndex !== index), { source: 'local' });
     renderRanking();
 }
 
 function renderRanking() {
     const ranking = getRanking();
     const liveMode = state === 'running' || state === 'paused' || state === 'quiz';
+    const canEditRanking = rankingSource !== 'online';
     const limit = liveMode ? 5 : 10;
     rankingPanel.dataset.mode = liveMode ? 'live' : 'full';
-    rankingPanel.dataset.editor = rankingEditorEnabled && !liveMode ? 'true' : 'false';
-    rankingEditorToggle.hidden = liveMode;
-    rankingEditorToggle.setAttribute('aria-pressed', rankingEditorEnabled && !liveMode ? 'true' : 'false');
+    rankingPanel.dataset.source = rankingSource;
+    rankingTitle.textContent = rankingSource === 'online' ? 'Ranking online' : 'Ranking local';
+    if (!canEditRanking) rankingEditorEnabled = false;
+    rankingPanel.dataset.editor = rankingEditorEnabled && !liveMode && canEditRanking ? 'true' : 'false';
+    rankingEditorToggle.hidden = liveMode || !canEditRanking;
+    rankingEditorToggle.setAttribute('aria-pressed', rankingEditorEnabled && !liveMode && canEditRanking ? 'true' : 'false');
     rankingLimit.textContent = liveMode ? 'Top 5' : 'Top 10';
 
     let displayRanking;
