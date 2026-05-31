@@ -1,24 +1,24 @@
 # Expo2026 - IF Rush
 
-Vitrine publica do IF Rush, um runner 3D de sessao curta criado para apresentar areas da Informatica em uma banca/exposicao.
+Vitrine pública do IF Rush, um runner 3D de sessão curta criado para apresentar áreas da Informática em uma banca/exposição.
 
 ![Preview do IF Rush](docs/if-rush-preview.png)
 
 ## Ideia
 
-O jogador corre por um percurso 3D, coleta conteudos sobre Informatica, responde quizzes e tenta entrar no ranking. A proposta e transformar uma demonstracao de curso em uma experiencia rapida, visual e jogavel.
+O jogador corre por um percurso 3D, coleta conteúdos sobre Informática, responde quizzes e tenta entrar no ranking. A proposta é transformar uma demonstração de curso em uma experiência rápida, visual e jogável.
 
 ## Destaques
 
-- Runner 3D com personagem customizavel.
+- Runner 3D com personagem customizável.
 - Quiz integrado ao fluxo da corrida.
 - Ranking local/online para uso em eventos.
 - Controles por teclado e toque.
-- Assets locais para funcionar bem em computadores de exposicao.
+- Assets locais para funcionar bem em computadores de exposição.
 
 ## Status
 
-O codigo-fonte completo fica em repositorio privado de backup. Este repositorio publico existe como vitrine da ideia e para centralizar a apresentacao do projeto sem expor historico, detalhes internos ou artefatos de desenvolvimento.
+O código-fonte completo fica em repositório privado de backup. Este repositório público existe como vitrine da ideia e para centralizar a apresentação do projeto sem expor histórico, detalhes internos ou artefatos de desenvolvimento.
 
 ## Tecnologia
 
